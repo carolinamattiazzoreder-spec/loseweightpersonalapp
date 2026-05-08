@@ -1,0 +1,16 @@
+{
+  "weights": [
+    {
+      "date": "2026-01-01",
+      "weight": 89.0,
+      "note": ""
+    },
+    {
+      "date": "2026-05-08",
+      "weight": 87.35,
+      "note": ""
+    }
+  ],
+  "goal_weight": 65.0,
+  "height_cm": 165
+}
