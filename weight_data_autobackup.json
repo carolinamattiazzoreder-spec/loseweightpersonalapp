@@ -13,6 +13,7 @@
   ],
   "goal_weight": 65.0,
   "height_cm": 165,
-  "last_saved_at": "2026-05-15T13:28:23",
-  "last_backup_at": "2026-05-15T13:28:23"
+  "last_saved_at": null,
+  "last_backup_at": null,
+  "backup_generated_at": "2026-05-15T13:28:23"
 }
