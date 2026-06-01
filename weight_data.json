@@ -1,6 +1,16 @@
 {
   "weights": [
     {
+      "date": "2025-09-01",
+      "weight": 95.0,
+      "note": ""
+    },
+    {
+      "date": "2025-12-01",
+      "weight": 90.0,
+      "note": ""
+    },
+    {
       "date": "2026-01-01",
       "weight": 89.0,
       "note": ""
@@ -9,10 +19,15 @@
       "date": "2026-05-08",
       "weight": 87.3,
       "note": ""
+    },
+    {
+      "date": "2026-05-15",
+      "weight": 86.7,
+      "note": ""
     }
   ],
   "goal_weight": 65.0,
   "height_cm": 165,
-  "last_saved_at": "2026-05-15T13:28:23",
+  "last_saved_at": "2026-05-15T13:32:27",
   "last_backup_at": "2026-05-15T13:28:23"
 }
