@@ -17,3 +17,8 @@ A simple Streamlit app template for you to modify!
    ```
    $ streamlit run streamlit_app.py
    ```
+
+## 📱 Android app
+
+There is a native Android version of this app in [`android/`](android/README.md).
+GitHub Actions builds the APK on every push (Actions → **Android APK** → artifact `WeightTracker-apk`).
