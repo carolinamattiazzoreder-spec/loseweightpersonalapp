@@ -37,8 +37,20 @@ import java.time.format.DateTimeFormatter
 
 private enum class Confirm { Import, ClearAll }
 
+class SettingsActions(
+    val saveProfile: (heightCm: Int, goalWeight: Double?) -> Unit = { _, _ -> },
+    val exportJson: (Uri) -> Unit = {},
+    val exportCsv: (Uri) -> Unit = {},
+    val importJson: (Uri) -> Unit = {},
+    val clearEntries: () -> Unit = {},
+)
+
 @Composable
-fun SettingsScreen(state: AppState, vm: WeightViewModel, modifier: Modifier = Modifier) {
+fun SettingsScreen(
+    state: AppState,
+    actions: SettingsActions,
+    modifier: Modifier = Modifier,
+) {
     val focus = LocalFocusManager.current
     var heightText by rememberSaveable(state.heightCm) { mutableStateOf(state.heightCm.toString()) }
     var goalText by rememberSaveable(state.goalWeight) { mutableStateOf(state.goalWeight?.let(::fmt1) ?: "") }
@@ -52,10 +64,10 @@ fun SettingsScreen(state: AppState, vm: WeightViewModel, modifier: Modifier = Mo
 
     val stamp = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
     val exportJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        uri?.let(vm::exportJson)
+        uri?.let(actions.exportJson)
     }
     val exportCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        uri?.let(vm::exportCsv)
+        uri?.let(actions.exportCsv)
     }
     val importJson = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -96,7 +108,7 @@ fun SettingsScreen(state: AppState, vm: WeightViewModel, modifier: Modifier = Mo
             text = "💾 Save profile",
             enabled = heightValid && goalValid,
             onClick = {
-                vm.saveProfile(height!!, if (goalText.isBlank()) null else goal)
+                actions.saveProfile(height!!, if (goalText.isBlank()) null else goal)
                 focus.clearFocus()
             },
         )
@@ -146,14 +158,14 @@ fun SettingsScreen(state: AppState, vm: WeightViewModel, modifier: Modifier = Mo
             title = "Import backup?",
             text = "This overwrites all current data with the contents of the file.",
             action = "Import",
-            onConfirm = { importUri?.let(vm::importJson) },
+            onConfirm = { importUri?.let(actions.importJson) },
             onDismiss = { confirm = null },
         )
         Confirm.ClearAll -> ConfirmDialog(
             title = "Delete all entries?",
             text = "This permanently deletes all logged entries. Height and goal are kept.",
             action = "Delete all",
-            onConfirm = vm::clearEntries,
+            onConfirm = actions.clearEntries,
             onDismiss = { confirm = null },
         )
         null -> Unit

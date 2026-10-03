@@ -15,8 +15,9 @@ O formato JSON é o mesmo do botão *Download backup (JSON)* do Streamlit, entã
 
 ## Instalar no celular
 
-1. No GitHub, abra **Actions → Android APK → execução mais recente** e baixe o artefato **WeightTracker-apk** (um `.zip` com `app-debug.apk`).
-2. Passe o `app-debug.apk` para o celular e abra. O Android vai pedir para permitir "instalar apps desconhecidos" — permita para o app que você usou para abrir o arquivo.
+1. No celular, abra a página **Releases** do repositório → **WeightTracker APK (latest)** e toque em **WeightTracker.apk**:
+   https://github.com/carolinamattiazzoreder-spec/loseweightpersonalapp/releases/tag/apk-latest
+2. Abra o arquivo baixado. O Android vai pedir para permitir "instalar apps desconhecidos" — permita para o app que você usou para abrir o arquivo.
 3. Para trazer seus dados: no app Streamlit vá em *Settings → Download backup (JSON)*, depois no Android em *Settings → Import JSON backup*.
 
 ## Compilar localmente

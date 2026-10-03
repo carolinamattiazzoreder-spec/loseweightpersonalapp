@@ -11,6 +11,9 @@ on:
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,9 +34,27 @@ jobs:
         run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
+        run: |
+          ./gradlew --no-daemon assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk app/build/WeightTracker.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: WeightTracker-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/WeightTracker.apk
+
+      # Direct download link for phones: Releases → "WeightTracker APK (latest)"
+      - name: Publish APK to GitHub Releases
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          target_commitish: ${{ github.sha }}
+          name: WeightTracker APK (latest)
+          make_latest: true
+          files: android/app/build/WeightTracker.apk
+          body: |
+            Latest build of the WeightTracker Android app (commit ${{ github.sha }}, branch ${{ github.ref_name }}).
+
+            Open this page on your phone, tap **WeightTracker.apk**, then open the downloaded file to install
+            (allow "install unknown apps" when Android asks).
