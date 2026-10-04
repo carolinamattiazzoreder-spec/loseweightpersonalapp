@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">WeightTracker</string>
+    <!-- Shown in the Painel greeting ("Olá, Carol"); leave empty for just "Olá!". -->
+    <string name="user_name" translatable="false">Carol</string>
 </resources>

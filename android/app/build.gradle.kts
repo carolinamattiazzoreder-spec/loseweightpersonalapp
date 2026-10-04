@@ -1,8 +1,13 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val figtreeResDir: File = layout.buildDirectory.dir("generated/figtree/res").get().asFile
+val figtreeUrl = "https://raw.githubusercontent.com/google/fonts/main/ofl/figtree/Figtree%5Bwght%5D.ttf"
 
 android {
     namespace = "com.weighttracker.app"
@@ -12,8 +17,8 @@ android {
         applicationId = "com.weighttracker.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     buildTypes {
@@ -34,7 +39,30 @@ android {
     buildFeatures {
         compose = true
     }
+
+    sourceSets["main"].res.srcDir(figtreeResDir)
 }
+
+// Figtree (SIL Open Font License), the design's typeface. Downloaded at build time
+// instead of committed; if the download fails the app falls back to the system font.
+val downloadFigtree by tasks.registering {
+    val target = figtreeResDir.resolve("font/figtree.ttf")
+    outputs.dir(figtreeResDir)
+    doLast {
+        if (target.length() > 0) return@doLast
+        target.parentFile.mkdirs()
+        try {
+            URI(figtreeUrl).toURL().openStream().use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+        } catch (e: Exception) {
+            target.delete()
+            logger.warn("Figtree font not downloaded (${e.message}); using the system font.")
+        }
+    }
+}
+
+tasks.named("preBuild") { dependsOn(downloadFigtree) }
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")

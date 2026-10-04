@@ -1,19 +1,19 @@
 package com.weighttracker.app.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -27,12 +27,12 @@ import androidx.compose.ui.unit.sp
 import com.weighttracker.app.ui.theme.WtColors
 
 enum class AppTab(val label: String, val icon: ImageVector) {
-    Dashboard("Dashboard", Icons.Filled.Home),
-    Log("Log Weight", Icons.Filled.Add),
-    Settings("Settings", Icons.Filled.Settings),
+    Dashboard("Painel", WtIcons.Home),
+    Log("Registrar", WtIcons.PlusCircle),
+    Settings("Ajustes", WtIcons.Sliders),
 }
 
-/** Top bar + bottom navigation shared by all screens. */
+/** Bottom navigation, the "registrar" FAB on the Painel, and the snackbar. */
 @Composable
 fun AppScaffold(
     tab: AppTab,
@@ -41,31 +41,51 @@ fun AppScaffold(
     content: @Composable () -> Unit,
 ) {
     Scaffold(
-        topBar = {
-            Column(Modifier.statusBarsPadding()) {
-                Text(
-                    "⚖️ WeightTracker",
-                    Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    color = WtColors.Purple,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-                HorizontalDivider(color = WtColors.SoftBorder)
-            }
-        },
+        containerColor = WtColors.Bg,
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = WtColors.Surface, tonalElevation = 0.dp) {
                 AppTab.entries.forEach {
+                    val selected = tab == it
                     NavigationBarItem(
-                        selected = tab == it,
+                        selected = selected,
                         onClick = { onTabSelected(it) },
-                        icon = { Icon(it.icon, contentDescription = null) },
-                        label = { Text(it.label) },
+                        icon = { Icon(it.icon, contentDescription = null, modifier = Modifier.size(21.dp)) },
+                        label = { Text(it.label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = WtColors.Ink,
+                            selectedTextColor = WtColors.Ink,
+                            indicatorColor = WtColors.Mint,
+                            unselectedIconColor = WtColors.Muted,
+                            unselectedTextColor = WtColors.Muted,
+                        ),
                     )
                 }
             }
         },
-        snackbarHost = { SnackbarHost(snackbar) },
+        floatingActionButton = {
+            if (tab == AppTab.Dashboard) {
+                FloatingActionButton(
+                    onClick = { onTabSelected(AppTab.Log) },
+                    shape = CircleShape,
+                    containerColor = WtColors.Primary,
+                    contentColor = WtColors.OnPrimary,
+                    elevation = FloatingActionButtonDefaults.elevation(6.dp),
+                ) {
+                    Icon(WtIcons.Plus, contentDescription = "Registrar peso", modifier = Modifier.size(24.dp))
+                }
+            }
+        },
+        snackbarHost = {
+            SnackbarHost(snackbar) { data ->
+                Snackbar(
+                    data,
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = WtColors.Ink,
+                    contentColor = WtColors.OnPrimary,
+                    actionColor = WtColors.Mint,
+                )
+            }
+        },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             content()
