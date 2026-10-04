@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bathroom scale: white body, orange dial, white needle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,32 h36 a8,8 0 0 1 8,8 v28 a8,8 0 0 1 -8,8 h-36 a8,8 0 0 1 -8,-8 v-28 a8,8 0 0 1 8,-8z" />
+    <path
+        android:fillColor="#F97316"
+        android:pathData="M54,38 a12,12 0 1 1 0,24 a12,12 0 1 1 0,-24z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M53,42 h2 v9 h-2z" />
+</vector>
