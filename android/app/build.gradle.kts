@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -50,8 +52,8 @@ val downloadFigtree by tasks.registering {
         if (target.length() > 0) return@doLast
         target.parentFile.mkdirs()
         try {
-            java.net.URI(figtreeUrl).toURL().openStream().use { input ->
-                target.outputStream().use { input.copyTo(it) }
+            URI(figtreeUrl).toURL().openStream().use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
             }
         } catch (e: Exception) {
             target.delete()
