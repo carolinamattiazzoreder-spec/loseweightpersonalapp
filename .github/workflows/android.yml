@@ -33,6 +33,10 @@ jobs:
       - name: Unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
 
+      - name: Read app version
+        id: version
+        run: echo "name=$(sed -n 's/.*versionName = \"\(.*\)\"/\1/p' app/build.gradle.kts)" >> "$GITHUB_OUTPUT"
+
       - name: Build debug APK
         run: |
           ./gradlew --no-daemon assembleDebug
@@ -58,3 +62,18 @@ jobs:
 
             Open this page on your phone, tap **WeightTracker.apk**, then open the downloaded file to install
             (allow "install unknown apps" when Android asks).
+
+      # Versioned release (e.g. v1.1) for each version that reaches main
+      - name: Publish versioned release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: WeightTracker ${{ steps.version.outputs.name }}
+          make_latest: false
+          files: android/app/build/WeightTracker.apk
+          body: |
+            WeightTracker ${{ steps.version.outputs.name }} for Android (commit ${{ github.sha }}).
+
+            Download **WeightTracker.apk** below on your phone and open it to install or update.
