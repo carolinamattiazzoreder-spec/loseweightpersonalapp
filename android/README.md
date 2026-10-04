@@ -4,12 +4,18 @@ Versão Android nativa (Kotlin + Jetpack Compose) do app Streamlit `streamlit_ap
 
 ## O que tem
 
-| Streamlit | Android |
+O visual segue o canvas **Design** (fundo menta, azul profundo, fonte Figtree, textos em português).
+
+| Aba | Conteúdo |
 |---|---|
-| 📊 Dashboard (peso atual, variação, IMC, meta, previsão de chegada, progresso, gráfico, tabela) | Aba **Dashboard** — mesmos cartões; gráfico com projeção de −1 kg/semana e linha da meta (toque num ponto para ver o valor) |
-| ➕ Log Weight (registrar / apagar) | Aba **Log Weight** — data, peso (aceita `80,5` ou `80.5`), nota; lista com botão de apagar |
-| ⚙️ Settings (perfil, exportar, importar, apagar tudo) | Aba **Settings** — altura e meta, exportar JSON/CSV, importar JSON, apagar tudo |
-| Dropbox (`WeightTrackerData.xlsx`) + backup a cada 16 h | Arquivo `weight_data.json` no próprio celular + **Backup do Android** (Google) automático |
+| **Painel** | Saudação com a data; cartão do peso (variação vs. anterior e na semana, progresso até a meta); "Quando chego na meta" (data prevista a −1 kg/semana e linha do tempo); Marcos; gráfico "Evolução" (pesagens, tendência, projeção e meta — toque para ver uma pesagem); calendário do mês com resumo; últimos registros com IMC |
+| **Registrar** | Data, peso (aceita `80,5` ou `80.5`), nota; histórico com exclusão; "DESFAZER" após salvar ou excluir |
+| **Ajustes** | Altura e peso meta; backup (exportar JSON/CSV, importar JSON); armazenamento; apagar todos os registros |
+
+Os dados ficam no arquivo `weight_data.json` do próprio celular, com **Backup do Android** (Google) automático.
+O nome da saudação ("Olá, Carol") está em `app/src/main/res/values/strings.xml` (`user_name`).
+
+A fonte Figtree (SIL Open Font License) é baixada pelo Gradle durante o build; sem internet, o app usa a fonte do sistema.
 
 O formato JSON é o mesmo do botão *Download backup (JSON)* do Streamlit, então dá para levar os dados de um para o outro.
 

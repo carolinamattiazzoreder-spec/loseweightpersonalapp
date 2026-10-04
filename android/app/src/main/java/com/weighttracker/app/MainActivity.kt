@@ -9,7 +9,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,17 +66,28 @@ private fun WeightTrackerApp(vm: WeightViewModel = viewModel()) {
     }
 
     LaunchedEffect(vm) {
-        vm.messages.collect { snackbar.showSnackbar(it) }
+        vm.messages.collect { message ->
+            val result = snackbar.showSnackbar(
+                message.text,
+                actionLabel = if (message.undoable) "DESFAZER" else null,
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) vm.undo()
+        }
     }
 
     AppScaffold(tab = tab, onTabSelected = { tab = it }, snackbar = snackbar) {
         if (!loaded) {
             Box(Modifier.fillMaxSize()) {
-                CircularProgressIndicator(Modifier.align(Alignment.Center), color = WtColors.Purple)
+                CircularProgressIndicator(Modifier.align(Alignment.Center), color = WtColors.Primary)
             }
         } else {
             when (tab) {
-                AppTab.Dashboard -> DashboardScreen(state)
+                AppTab.Dashboard -> DashboardScreen(
+                    state,
+                    onOpenLog = { tab = AppTab.Log },
+                    onOpenSettings = { tab = AppTab.Settings },
+                )
                 AppTab.Log -> LogScreen(state, onSave = vm::addEntry, onDelete = vm::deleteEntry)
                 AppTab.Settings -> SettingsScreen(state, settingsActions)
             }

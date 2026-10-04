@@ -17,26 +17,26 @@ fun AppPreview(tab: AppTab, state: AppState = SampleData.state) {
     WeightTrackerTheme {
         AppScaffold(tab = tab, onTabSelected = {}) {
             when (tab) {
-                AppTab.Dashboard -> DashboardScreen(state)
-                AppTab.Log -> LogScreen(state, onSave = { _, _, _ -> }, onDelete = {})
+                AppTab.Dashboard -> DashboardScreen(state, onOpenLog = {}, onOpenSettings = {}, today = SampleData.today)
+                AppTab.Log -> LogScreen(state, onSave = { _, _, _ -> }, onDelete = {}, today = SampleData.today)
                 AppTab.Settings -> SettingsScreen(state, SettingsActions())
             }
         }
     }
 }
 
-@Preview(name = "Dashboard", showSystemUi = true, device = "id:pixel_7")
+@Preview(name = "Painel", showSystemUi = true, device = "id:pixel_7", heightDp = 1800)
 @Composable
 private fun DashboardPreview() = AppPreview(AppTab.Dashboard)
 
-@Preview(name = "Dashboard (empty)", showSystemUi = true, device = "id:pixel_7")
+@Preview(name = "Painel (vazio)", showSystemUi = true, device = "id:pixel_7")
 @Composable
 private fun EmptyDashboardPreview() = AppPreview(AppTab.Dashboard, AppState())
 
-@Preview(name = "Log Weight", showSystemUi = true, device = "id:pixel_7")
+@Preview(name = "Registrar", showSystemUi = true, device = "id:pixel_7")
 @Composable
 private fun LogPreview() = AppPreview(AppTab.Log)
 
-@Preview(name = "Settings", showSystemUi = true, device = "id:pixel_7")
+@Preview(name = "Ajustes", showSystemUi = true, device = "id:pixel_7")
 @Composable
 private fun SettingsPreview() = AppPreview(AppTab.Settings)

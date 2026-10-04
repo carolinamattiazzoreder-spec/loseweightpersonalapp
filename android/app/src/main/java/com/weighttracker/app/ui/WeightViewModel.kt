@@ -9,7 +9,6 @@ import com.weighttracker.app.data.StateCsv
 import com.weighttracker.app.data.StateJson
 import com.weighttracker.app.data.WeightEntry
 import com.weighttracker.app.data.WeightRepository
-import com.weighttracker.app.data.fmt1
 import com.weighttracker.app.data.normalizeWeights
 import com.weighttracker.app.data.round1
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +24,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
+/** A snackbar message; [undoable] ones offer "DESFAZER". */
+data class UiMessage(val text: String, val undoable: Boolean = false)
+
 class WeightViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = WeightRepository(application)
@@ -36,8 +38,11 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
     private val _loaded = MutableStateFlow(false)
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 
-    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
-    val messages: SharedFlow<String> = _messages.asSharedFlow()
+    private val _messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
+    val messages: SharedFlow<UiMessage> = _messages.asSharedFlow()
+
+    /** State before the last undoable change. */
+    private var undoState: AppState? = null
 
     private val loadJob = viewModelScope.launch {
         _state.value = withContext(Dispatchers.IO) { repository.load() }
@@ -46,18 +51,25 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
 
     fun addEntry(date: LocalDate, weight: Double, note: String) {
         val entry = WeightEntry(date, round1(weight), note.trim())
-        update("Saved ${fmt1(entry.weight)} kg on $date") {
+        update("Registro salvo: ${kg(entry.weight)} kg", undoable = true) {
             it.copy(weights = it.weights + entry)
         }
     }
 
     fun deleteEntry(date: LocalDate) =
-        update("Deleted entry for $date") { s -> s.copy(weights = s.weights.filter { it.date != date }) }
+        update("Registro excluído", undoable = true) { s -> s.copy(weights = s.weights.filter { it.date != date }) }
 
     fun saveProfile(heightCm: Int, goalWeight: Double?) =
-        update("Profile saved") { it.copy(heightCm = heightCm, goalWeight = goalWeight?.let(::round1)) }
+        update("Ajustes salvos") { it.copy(heightCm = heightCm, goalWeight = goalWeight?.let(::round1)) }
 
-    fun clearEntries() = update("All entries deleted") { it.copy(weights = emptyList()) }
+    fun clearEntries() = update("Todos os registros foram apagados", undoable = true) { it.copy(weights = emptyList()) }
+
+    /** Restores the state from before the last save/delete. */
+    fun undo() {
+        val previous = undoState ?: return
+        undoState = null
+        update(null) { previous }
+    }
 
     fun importJson(uri: Uri) {
         viewModelScope.launch {
@@ -68,16 +80,16 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
                     StateJson.decode(text)
                 }
             } catch (e: Exception) {
-                _messages.emit("Import failed: ${e.message}")
+                _messages.emit(UiMessage("Falha ao importar: ${e.message}"))
                 return@launch
             }
-            update("Imported ${imported.weights.size} entries") { imported }
+            update("${imported.weights.size} registros importados", undoable = true) { imported }
         }
     }
 
-    fun exportJson(uri: Uri) = export(uri, "JSON backup exported") { StateJson.encode(it) }
+    fun exportJson(uri: Uri) = export(uri, "Backup exportado") { StateJson.encode(it) }
 
-    fun exportCsv(uri: Uri) = export(uri, "CSV exported") { StateCsv.encode(it) }
+    fun exportCsv(uri: Uri) = export(uri, "Planilha exportada") { StateCsv.encode(it) }
 
     private fun export(uri: Uri, successMessage: String, encode: (AppState) -> String) {
         viewModelScope.launch {
@@ -87,24 +99,27 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
                     resolver().openOutputStream(uri)?.use { it.write(content.encodeToByteArray()) }
                         ?: error("Cannot open file")
                 }
-                _messages.emit(successMessage)
+                _messages.emit(UiMessage(successMessage))
             } catch (e: Exception) {
-                _messages.emit("Export failed: ${e.message}")
+                _messages.emit(UiMessage("Falha ao exportar: ${e.message}"))
             }
         }
     }
 
-    private fun update(successMessage: String, transform: (AppState) -> AppState) {
+    private fun update(successMessage: String?, undoable: Boolean = false, transform: (AppState) -> AppState) {
         viewModelScope.launch {
             loadJob.join()
             writeLock.withLock {
-                val next = transform(_state.value)
+                val before = _state.value
+                val next = transform(before)
                 _state.value = next.copy(weights = normalizeWeights(next.weights))
                 try {
                     _state.value = withContext(Dispatchers.IO) { repository.save(next) }
-                    _messages.emit(successMessage)
+                    undoState = if (undoable) before else null
+                    successMessage?.let { _messages.emit(UiMessage(it, undoable)) }
                 } catch (e: Exception) {
-                    _messages.emit("Save failed: ${e.message}")
+                    _state.value = before
+                    _messages.emit(UiMessage("Falha ao salvar: ${e.message}"))
                 }
             }
         }
