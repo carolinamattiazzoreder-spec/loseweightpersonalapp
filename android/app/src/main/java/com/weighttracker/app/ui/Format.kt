@@ -9,14 +9,17 @@ import kotlin.math.abs
 
 private val PT_BR = Locale("pt", "BR")
 
-/** 78.4 → "78,4" */
-fun kg(value: Double): String = String.format(PT_BR, "%.1f", value)
+/** Weights keep up to 2 decimals: 76.85 → "76,85", 78.4 → "78,4", 80.0 → "80,0". */
+fun kg(value: Double): String {
+    val text = String.format(PT_BR, "%.2f", value)
+    return if (text.endsWith('0')) text.dropLast(1) else text
+}
 
-/** −0.3 → "−0,3", 0.3 → "+0,3" (typographic minus). */
+/** −0.3 → "−0,3", 0.05 → "+0,05" (typographic minus). */
 fun kgSigned(value: Double): String {
     val sign = when {
-        value <= -0.05 -> "−"
-        value >= 0.05 -> "+"
+        value <= -0.005 -> "−"
+        value >= 0.005 -> "+"
         else -> ""
     }
     return sign + kg(abs(value))

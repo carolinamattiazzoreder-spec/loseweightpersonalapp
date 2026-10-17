@@ -28,7 +28,7 @@ fun etaDate(weeks: Double, from: LocalDate = LocalDate.now()): LocalDate =
 fun weeklyChange(weights: List<WeightEntry>): Double? {
     val last = weights.lastOrNull() ?: return null
     val reference = weights.lastOrNull { it.date <= last.date.minusDays(7) } ?: return null
-    return round1(last.weight - reference.weight)
+    return round2(last.weight - reference.weight)
 }
 
 data class DashboardStats(
@@ -66,10 +66,10 @@ fun computeStats(state: AppState): DashboardStats? {
         start = start,
         startDate = weights.first().date,
         weeklyChange = weeklyChange(weights),
-        lost = round1(start - current),
+        lost = round2(start - current),
         bmi = calcBmi(current, state.heightCm),
         goal = goal,
-        remaining = goal?.let { round1(current - it) },
+        remaining = goal?.let { round2(current - it) },
         weeksToGoal = goal?.let { weeksToGoal(current, it) },
         progressPercent = progress,
         bmiAtGoal = goal?.let { calcBmi(it, state.heightCm) },
@@ -139,9 +139,9 @@ fun monthSummary(weights: List<WeightEntry>, month: YearMonth, today: LocalDate)
     if (inMonth.isEmpty()) return MonthSummary(month, null, null, 0, elapsed, days)
     val base = weights.lastOrNull { it.date < month.atDay(1) } ?: inMonth.first()
     val last = inMonth.last()
-    val change = round1(last.weight - base.weight)
+    val change = round2(last.weight - base.weight)
     val spanDays = ChronoUnit.DAYS.between(base.date, last.date)
-    val weekly = if (spanDays >= 7) round1(change / (spanDays / 7.0)) else null
+    val weekly = if (spanDays >= 7) round2(change / (spanDays / 7.0)) else null
     return MonthSummary(month, change, weekly, inMonth.size, elapsed, days)
 }
 

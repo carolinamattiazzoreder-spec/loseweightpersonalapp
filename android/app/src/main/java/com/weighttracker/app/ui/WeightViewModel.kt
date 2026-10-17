@@ -10,7 +10,7 @@ import com.weighttracker.app.data.StateJson
 import com.weighttracker.app.data.WeightEntry
 import com.weighttracker.app.data.WeightRepository
 import com.weighttracker.app.data.normalizeWeights
-import com.weighttracker.app.data.round1
+import com.weighttracker.app.data.round2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,7 +50,7 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun addEntry(date: LocalDate, weight: Double, note: String) {
-        val entry = WeightEntry(date, round1(weight), note.trim())
+        val entry = WeightEntry(date, round2(weight), note.trim())
         update("Registro salvo: ${kg(entry.weight)} kg", undoable = true) {
             it.copy(weights = it.weights + entry)
         }
@@ -60,7 +60,7 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
         update("Registro excluído", undoable = true) { s -> s.copy(weights = s.weights.filter { it.date != date }) }
 
     fun saveProfile(heightCm: Int, goalWeight: Double?) =
-        update("Ajustes salvos") { it.copy(heightCm = heightCm, goalWeight = goalWeight?.let(::round1)) }
+        update("Ajustes salvos") { it.copy(heightCm = heightCm, goalWeight = goalWeight?.let(::round2)) }
 
     fun clearEntries() = update("Todos os registros foram apagados", undoable = true) { it.copy(weights = emptyList()) }
 

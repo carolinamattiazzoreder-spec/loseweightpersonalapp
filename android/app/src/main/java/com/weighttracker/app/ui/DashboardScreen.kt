@@ -178,8 +178,8 @@ private fun HeroCard(stats: DashboardStats, today: LocalDate) {
             }
             stats.weeklyChange?.let { w ->
                 val text = when {
-                    w <= -0.05 -> "▼ ${kg(-w)} kg nesta semana"
-                    w >= 0.05 -> "▲ ${kg(w)} kg nesta semana"
+                    w <= -0.005 -> "▼ ${kg(-w)} kg nesta semana"
+                    w >= 0.005 -> "▲ ${kg(w)} kg nesta semana"
                     else -> "Estável nesta semana"
                 }
                 Text(text, Modifier.padding(top = 6.dp), color = WtColors.Mint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -519,8 +519,8 @@ private fun RecentCard(state: AppState, stats: DashboardStats, onOpenLog: () -> 
                             "${kgSigned(delta)} kg",
                             fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                             color = when {
-                                delta <= -0.05 -> WtColors.Good
-                                delta >= 0.05 -> WtColors.RoseInk
+                                delta <= -0.005 -> WtColors.Good
+                                delta >= 0.005 -> WtColors.RoseInk
                                 else -> WtColors.Muted
                             },
                         )

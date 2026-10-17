@@ -30,7 +30,7 @@ class StateJsonTest {
         assertEquals(
             listOf(
                 WeightEntry(LocalDate.of(2025, 9, 1), 95.0, "start"),
-                WeightEntry(LocalDate.of(2025, 12, 1), 90.0, "dup"),
+                WeightEntry(LocalDate.of(2025, 12, 1), 89.96, "dup"),
             ),
             state.weights,
         )
@@ -51,7 +51,7 @@ class StateJsonTest {
     @Test
     fun roundTrips() {
         val original = AppState(
-            weights = listOf(WeightEntry(LocalDate.of(2026, 5, 8), 87.3, "after \"gym\", tired")),
+            weights = listOf(WeightEntry(LocalDate.of(2026, 5, 8), 76.85, "after \"gym\", tired")),
             goalWeight = 65.0,
             heightCm = 165,
             lastSavedAt = "2026-05-15T13:32:27",

@@ -46,6 +46,15 @@ class AnalyticsTest {
     }
 
     @Test
+    fun changesKeepTwoDecimals() {
+        val state = AppState(weights = listOf(entry("2026-10-01", 77.3), entry("2026-10-09", 76.85)), goalWeight = 72.25)
+        val stats = computeStats(state)!!
+        assertEquals(0.45, stats.lost, 1e-9)
+        assertEquals(4.6, stats.remaining!!, 1e-9)
+        assertEquals(-0.45, stats.weeklyChange!!, 1e-9)
+    }
+
+    @Test
     fun weeklyChangeNeedsAnEntryAWeekOld() {
         assertNull(weeklyChange(listOf(entry("2026-10-01", 80.0), entry("2026-10-04", 79.0))))
     }
@@ -75,7 +84,7 @@ class AnalyticsTest {
         val weights = listOf(entry("2026-09-26", 79.1), entry("2026-10-01", 79.0), entry("2026-10-03", 78.7), entry("2026-10-04", 78.4))
         val summary = monthSummary(weights, YearMonth.of(2026, 10), LocalDate.parse("2026-10-04"))
         assertEquals(-0.7, summary.change!!, 1e-9)
-        assertEquals(-0.6, summary.weeklyAverage!!, 1e-9)
+        assertEquals(-0.61, summary.weeklyAverage!!, 1e-9)
         assertEquals(3, summary.count)
         assertEquals(4, summary.elapsedDays)
         assertEquals(setOf(1, 3, 4), summary.daysWeighed)
@@ -95,8 +104,8 @@ class AnalyticsTest {
     }
 
     @Test
-    fun normalizeDedupesByDateLastWins() {
-        val result = normalizeWeights(listOf(entry("2026-01-02", 80.04), entry("2026-01-01", 81.0), entry("2026-01-02", 79.96)))
-        assertEquals(listOf(entry("2026-01-01", 81.0), entry("2026-01-02", 80.0)), result)
+    fun normalizeDedupesByDateLastWinsAndKeepsTwoDecimals() {
+        val result = normalizeWeights(listOf(entry("2026-01-02", 80.04), entry("2026-01-01", 76.85), entry("2026-01-02", 79.964)))
+        assertEquals(listOf(entry("2026-01-01", 76.85), entry("2026-01-02", 79.96)), result)
     }
 }

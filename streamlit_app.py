@@ -194,7 +194,7 @@ def normalize_weights(weights):
         note_val   = str(item.get("note",   "")).strip()
         try:
             parsed_date   = datetime.strptime(date_val, "%Y-%m-%d").strftime("%Y-%m-%d")
-            parsed_weight = round(float(weight_val), 1)
+            parsed_weight = round(float(weight_val), 2)
         except Exception:
             continue
         by_date[parsed_date] = {"date": parsed_date, "weight": parsed_weight, "note": note_val}
@@ -213,7 +213,7 @@ def ensure_keys(d):
         base["height_cm"] = 170
     try:
         gw = base.get("goal_weight")
-        base["goal_weight"] = round(float(gw), 1) if gw not in (None, "") else None
+        base["goal_weight"] = round(float(gw), 2) if gw not in (None, "") else None
     except Exception:
         base["goal_weight"] = None
     return base
@@ -379,7 +379,7 @@ def weight_trend_label(weights):
     if abs(delta) < 0.1:
         return "Stable this week"
     direction = "▼" if delta < 0 else "▲"
-    return f"{direction} {abs(delta):.1f} kg this week"
+    return f"{direction} {abs(delta):.2f} kg this week"
 
 
 # ── Chart builder ─────────────────────────────────────────────────────────────
@@ -542,7 +542,7 @@ if page == "📊 Dashboard":
         total_change = round(sw - cw, 2)
         bmi_val      = calc_bmi(cw, height)
         weeks        = weeks_to_goal(cw, goal) if goal else None
-        rem          = round(cw - goal, 1) if goal else None
+        rem          = round(cw - goal, 2) if goal else None
 
         # ── Top row ──────────────────────────────────────────────────────────
         top_a, top_b, top_c = st.columns([1.35, 1, 1])
@@ -568,7 +568,7 @@ if page == "📊 Dashboard":
             st.markdown(
                 f'<div class="stat-card sc-purple">'
                 f'<div class="sc-lbl">Total Change</div>'
-                f'<div class="sc-val">{change_icon} {abs(total_change):.1f} kg</div>'
+                f'<div class="sc-val">{change_icon} {abs(total_change):.2f} kg</div>'
                 f'<div class="sc-sub">since {df["date"].iloc[0]}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -597,7 +597,7 @@ if page == "📊 Dashboard":
                     f'<div class="stat-card sc-dark">'
                     f'<div class="sc-lbl">Goal Weight</div>'
                     f'<div class="sc-val">🎯 {goal} kg</div>'
-                    f'<div class="sc-sub">{rem:+.1f} kg remaining</div>'
+                    f'<div class="sc-sub">{rem:+.2f} kg remaining</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -660,14 +660,14 @@ elif page == "➕ Log Weight":
             entry_date = st.date_input("Date", value=datetime.today())
         with col_w:
             entry_weight = st.number_input("Weight (kg)", min_value=20.0, max_value=300.0,
-                                           value=80.0, step=0.1, format="%.1f")
+                                           value=80.0, step=0.05, format="%.2f")
         entry_note = st.text_input("Note (optional)", placeholder="e.g. After workout, morning weigh-in…")
         submitted  = st.form_submit_button("💾 Save Entry")
 
     if submitted:
         new_entry = {
             "date":   entry_date.strftime("%Y-%m-%d"),
-            "weight": round(float(entry_weight), 1),
+            "weight": round(float(entry_weight), 2),
             "note":   entry_note.strip(),
         }
         current = deepcopy(st.session_state.app_state)
@@ -714,14 +714,14 @@ elif page == "⚙️ Settings":
                 "Goal weight (kg)",
                 min_value=20.0, max_value=300.0,
                 value=gw_default,
-                step=0.5, format="%.1f",
+                step=0.05, format="%.2f",
             )
         save_profile = st.form_submit_button("💾 Save Profile")
 
     if save_profile:
         current                 = deepcopy(st.session_state.app_state)
         current["height_cm"]    = int(new_height)
-        current["goal_weight"]  = round(float(new_goal), 1)
+        current["goal_weight"]  = round(float(new_goal), 2)
         st.session_state.app_state = save_data(current)
         st.success("✅ Profile saved!")
 

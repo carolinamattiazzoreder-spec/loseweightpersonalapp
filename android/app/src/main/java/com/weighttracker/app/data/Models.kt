@@ -23,12 +23,12 @@ fun round1(value: Double): Double = Math.round(value * 10.0) / 10.0
 
 fun round2(value: Double): Double = Math.round(value * 100.0) / 100.0
 
-/** Deduplicate by date (last write wins), round, sort ascending. */
+/** Deduplicate by date (last write wins), round to 0.01 kg, sort ascending. */
 fun normalizeWeights(entries: List<WeightEntry>): List<WeightEntry> {
     val byDate = LinkedHashMap<LocalDate, WeightEntry>()
     for (entry in entries) {
         if (!entry.weight.isFinite()) continue
-        byDate[entry.date] = entry.copy(weight = round1(entry.weight), note = entry.note.trim())
+        byDate[entry.date] = entry.copy(weight = round2(entry.weight), note = entry.note.trim())
     }
     return byDate.values.sortedBy { it.date }
 }
