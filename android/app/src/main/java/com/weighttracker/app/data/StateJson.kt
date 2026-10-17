@@ -26,6 +26,7 @@ object StateJson {
             .put("goal_weight", state.goalWeight ?: JSONObject.NULL)
             .put("height_cm", state.heightCm)
             .put("last_saved_at", state.lastSavedAt ?: JSONObject.NULL)
+            .apply { state.name?.let { put("name", it) } }
             .toString(2)
     }
 
@@ -48,6 +49,7 @@ object StateJson {
             heightCm = parseDouble(root.opt("height_cm"))?.toInt()?.takeIf { it > 0 }
                 ?: AppState.DEFAULT_HEIGHT_CM,
             lastSavedAt = parseString(root.opt("last_saved_at")).ifBlank { null },
+            name = (root.opt("name") as? String)?.trim(),
         )
     }
 

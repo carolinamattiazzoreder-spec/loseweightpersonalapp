@@ -34,7 +34,7 @@ import java.time.format.DateTimeFormatter
 private enum class Confirm { Import, ClearAll }
 
 class SettingsActions(
-    val saveProfile: (heightCm: Int, goalWeight: Double?) -> Unit = { _, _ -> },
+    val saveProfile: (name: String, heightCm: Int, goalWeight: Double?) -> Unit = { _, _, _ -> },
     val exportJson: (Uri) -> Unit = {},
     val exportCsv: (Uri) -> Unit = {},
     val importJson: (Uri) -> Unit = {},
@@ -48,6 +48,8 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val focus = LocalFocusManager.current
+    val currentName = userName(state)
+    var nameText by rememberSaveable(currentName) { mutableStateOf(currentName) }
     var heightText by rememberSaveable(state.heightCm) { mutableStateOf(state.heightCm.toString()) }
     var goalText by rememberSaveable(state.goalWeight) { mutableStateOf(state.goalWeight?.let(::kg) ?: "") }
     var confirm by remember { mutableStateOf<Confirm?>(null) }
@@ -57,6 +59,7 @@ fun SettingsScreen(
     val heightValid = height != null && height in 100..250
     val goal = parseDecimal(goalText)
     val goalValid = goalText.isBlank() || (goal != null && goal in 20.0..300.0)
+    val nameValid = nameText.trim().length <= 30
 
     val stamp = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
     val exportJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -87,6 +90,15 @@ fun SettingsScreen(
                 IconCircle(WtIcons.Flag, Tone(WtColors.Rose, WtColors.RoseInk))
                 CardTitle("Perfil e meta")
             }
+            LabeledField(
+                label = "Nome",
+                value = nameText,
+                onValueChange = { nameText = it },
+                placeholder = "Seu nome",
+                isError = !nameValid,
+                errorText = "Use até 30 caracteres",
+                textStyle = fieldStyle,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LabeledField(
                     label = "Altura (cm)",
@@ -112,9 +124,9 @@ fun SettingsScreen(
             }
             PrimaryPillButton(
                 text = "Salvar ajustes",
-                enabled = heightValid && goalValid,
+                enabled = heightValid && goalValid && nameValid,
                 onClick = {
-                    actions.saveProfile(height!!, if (goalText.isBlank()) null else goal)
+                    actions.saveProfile(nameText, height!!, if (goalText.isBlank()) null else goal)
                     focus.clearFocus()
                 },
             )

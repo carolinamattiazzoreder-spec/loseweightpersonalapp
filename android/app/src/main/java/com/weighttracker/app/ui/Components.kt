@@ -40,9 +40,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.weighttracker.app.R
+import com.weighttracker.app.data.AppState
 import com.weighttracker.app.data.WeightEntry
 import com.weighttracker.app.ui.theme.Tone
 import com.weighttracker.app.ui.theme.WtColors
+
+/** Name for the greeting: the one saved in Ajustes, else the app default. */
+@Composable
+fun userName(state: AppState): String = state.name ?: stringResource(R.string.user_name)
 
 /** White rounded card with the design's soft shadow. */
 @Composable

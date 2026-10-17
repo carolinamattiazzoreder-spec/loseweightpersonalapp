@@ -74,7 +74,7 @@ fun DashboardScreen(
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        item { Greeting(today, onOpenSettings) }
+        item { Greeting(userName(state), today, onOpenSettings) }
         if (stats == null) {
             item { EmptyCard(onOpenLog) }
             return@LazyColumn
@@ -93,8 +93,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun Greeting(today: LocalDate, onOpenSettings: () -> Unit) {
-    val name = stringResource(R.string.user_name)
+private fun Greeting(name: String, today: LocalDate, onOpenSettings: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(
             Modifier.size(44.dp).clip(CircleShape).background(WtColors.Mint),

@@ -46,6 +46,7 @@ class StateJsonTest {
         assertNull(state.goalWeight)
         assertEquals(AppState.DEFAULT_HEIGHT_CM, state.heightCm)
         assertNull(state.lastSavedAt)
+        assertNull(state.name)
     }
 
     @Test
@@ -55,6 +56,7 @@ class StateJsonTest {
             goalWeight = 65.0,
             heightCm = 165,
             lastSavedAt = "2026-05-15T13:32:27",
+            name = "Carol",
         )
         assertEquals(original, StateJson.decode(StateJson.encode(original)))
     }
