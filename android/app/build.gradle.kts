@@ -17,13 +17,28 @@ android {
         applicationId = "com.weighttracker.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
+    }
+
+    // One fixed key for every build, so a new APK installs as an update of the
+    // previous one (a temporary per-build key makes Android refuse the update).
+    signingConfigs {
+        create("shared") {
+            storeFile = file("signing/weighttracker.jks")
+            storePassword = "weighttracker"
+            keyAlias = "weighttracker"
+            keyPassword = "weighttracker"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("shared")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("shared")
         }
     }
 

@@ -26,6 +26,11 @@ O formato JSON é o mesmo do botão *Download backup (JSON)* do Streamlit, entã
 2. Abra o arquivo baixado. O Android vai pedir para permitir "instalar apps desconhecidos" — permita para o app que você usou para abrir o arquivo.
 3. Para trazer seus dados: no app Streamlit vá em *Settings → Download backup (JSON)*, depois no Android em *Settings → Import JSON backup*.
 
+## Atualizar
+
+Todas as versões (a partir da 1.4) são assinadas com a mesma chave (`app/signing/weighttracker.jks`), então basta instalar o APK novo por cima: os registros continuam no celular.
+Ao vir de uma versão anterior à 1.4 é preciso desinstalar uma última vez — antes, exporte o backup em **Ajustes → Exportar backup (JSON)** e importe depois.
+
 ## Compilar localmente
 
 Abra a pasta `android/` no Android Studio, ou rode:
