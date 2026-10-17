@@ -13,6 +13,8 @@ data class AppState(
     val goalWeight: Double? = null,
     val heightCm: Int = DEFAULT_HEIGHT_CM,
     val lastSavedAt: String? = null,
+    /** Name in the Painel greeting; null = not set yet (the app default is used). */
+    val name: String? = null,
 ) {
     companion object {
         const val DEFAULT_HEIGHT_CM = 170

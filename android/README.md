@@ -13,7 +13,7 @@ O visual segue o canvas **Design** (fundo menta, azul profundo, fonte Figtree, t
 | **Ajustes** | Altura e peso meta; backup (exportar JSON/CSV, importar JSON); armazenamento; apagar todos os registros |
 
 Os dados ficam no arquivo `weight_data.json` do próprio celular, com **Backup do Android** (Google) automático.
-O nome da saudação ("Olá, Carol") está em `app/src/main/res/values/strings.xml` (`user_name`).
+O nome da saudação ("Olá, Carol") pode ser mudado em **Ajustes → Perfil e meta**.
 
 A fonte Figtree (SIL Open Font License) é baixada pelo Gradle durante o build; sem internet, o app usa a fonte do sistema.
 

@@ -59,8 +59,10 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteEntry(date: LocalDate) =
         update("Registro excluído", undoable = true) { s -> s.copy(weights = s.weights.filter { it.date != date }) }
 
-    fun saveProfile(heightCm: Int, goalWeight: Double?) =
-        update("Ajustes salvos") { it.copy(heightCm = heightCm, goalWeight = goalWeight?.let(::round2)) }
+    fun saveProfile(name: String, heightCm: Int, goalWeight: Double?) =
+        update("Ajustes salvos") {
+            it.copy(name = name.trim(), heightCm = heightCm, goalWeight = goalWeight?.let(::round2))
+        }
 
     fun clearEntries() = update("Todos os registros foram apagados", undoable = true) { it.copy(weights = emptyList()) }
 
