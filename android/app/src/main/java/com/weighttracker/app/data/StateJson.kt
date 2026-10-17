@@ -44,7 +44,7 @@ object StateJson {
         }
         return AppState(
             weights = normalizeWeights(entries),
-            goalWeight = parseDouble(root.opt("goal_weight"))?.let(::round1),
+            goalWeight = parseDouble(root.opt("goal_weight"))?.let(::round2),
             heightCm = parseDouble(root.opt("height_cm"))?.toInt()?.takeIf { it > 0 }
                 ?: AppState.DEFAULT_HEIGHT_CM,
             lastSavedAt = parseString(root.opt("last_saved_at")).ifBlank { null },
