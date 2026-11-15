@@ -59,6 +59,7 @@ class MainActivity : ComponentActivity() {
 private fun WeightTrackerApp(vm: WeightViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val loaded by vm.loaded.collectAsStateWithLifecycle()
+    val updateStatus by vm.updateStatus.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(AppTab.Dashboard) }
     val snackbar = remember { SnackbarHostState() }
     val settingsActions = remember(vm) {
@@ -68,6 +69,7 @@ private fun WeightTrackerApp(vm: WeightViewModel = viewModel()) {
             exportCsv = vm::exportCsv,
             importJson = vm::importJson,
             clearEntries = vm::clearEntries,
+            checkUpdate = vm::checkForUpdate,
         )
     }
 
@@ -102,7 +104,11 @@ private fun WeightTrackerApp(vm: WeightViewModel = viewModel()) {
                         onOpenSettings = { tab = AppTab.Settings },
                     )
                     AppTab.Log -> LogScreen(state, onSave = vm::addEntry, onDelete = vm::deleteEntry)
-                    AppTab.Settings -> SettingsScreen(state, settingsActions)
+                    AppTab.Settings -> SettingsScreen(
+                        state, settingsActions,
+                        installedVersion = vm.installedVersion,
+                        updateStatus = updateStatus,
+                    )
                 }
             }
         }

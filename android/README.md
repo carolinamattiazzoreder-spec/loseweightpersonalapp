@@ -10,7 +10,7 @@ O visual segue o canvas **Design** (fundo menta, azul profundo, fonte Figtree, t
 |---|---|
 | **Painel** | Cards entram animados; saudação com a data; cartão do peso (variação vs. anterior e na semana, progresso até a meta); "Quando chego na meta" (data prevista a −1 kg/semana e linha do tempo); gráfico "Evolução" com períodos 7d / 30d / 90d / Tudo, resumo (variação, média, mín., máx.) e leitura ao tocar ou arrastar; Marcos a cada 5 kg; calendário do mês com resumo; últimos registros com IMC |
 | **Registrar** | Data, peso (aceita `80,5` ou `80.5`), nota; histórico com exclusão; "DESFAZER" após salvar ou excluir |
-| **Ajustes** | Altura e peso meta; backup (exportar JSON/CSV, importar JSON); armazenamento; apagar todos os registros |
+| **Ajustes** | Nome, altura e peso meta; backup (exportar JSON/CSV, importar JSON); armazenamento; verificar atualização; apagar todos os registros |
 
 Os dados ficam no arquivo `weight_data.json` do próprio celular, com **Backup do Android** (Google) automático.
 O nome da saudação ("Olá, Carol") pode ser mudado em **Ajustes → Perfil e meta**.
@@ -27,6 +27,8 @@ O formato JSON é o mesmo do botão *Download backup (JSON)* do Streamlit, entã
 3. Para trazer seus dados: no app Streamlit vá em *Settings → Download backup (JSON)*, depois no Android em *Settings → Import JSON backup*.
 
 ## Atualizar
+
+Em **Ajustes → Atualizações → Verificar atualização** o app consulta os releases do GitHub e, se houver versão mais nova, oferece o download do APK (abra o arquivo baixado para instalar por cima).
 
 Todas as versões (a partir da 1.4) são assinadas com a mesma chave (`app/signing/weighttracker.jks`), então basta instalar o APK novo por cima: os registros continuam no celular.
 Ao vir de uma versão anterior à 1.4 é preciso desinstalar uma última vez — antes, exporte o backup em **Ajustes → Exportar backup (JSON)** e importe depois.

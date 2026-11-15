@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Only for "Verificar atualização" in Ajustes (GitHub releases API). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- allowBackup: Android backs up the app's data (weight_data.json) to the user's Google account. -->
     <application
         android:allowBackup="true"

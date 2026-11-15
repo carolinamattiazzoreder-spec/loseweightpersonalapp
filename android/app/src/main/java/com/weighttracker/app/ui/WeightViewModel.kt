@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.weighttracker.app.data.AppState
 import com.weighttracker.app.data.StateCsv
 import com.weighttracker.app.data.StateJson
+import com.weighttracker.app.data.UpdateCheck
+import com.weighttracker.app.data.UpdateChecker
 import com.weighttracker.app.data.WeightEntry
 import com.weighttracker.app.data.WeightRepository
 import com.weighttracker.app.data.normalizeWeights
@@ -27,6 +29,13 @@ import java.time.LocalDate
 /** A snackbar message; [undoable] ones offer "DESFAZER". */
 data class UiMessage(val text: String, val undoable: Boolean = false)
 
+/** State of the "Verificar atualização" button in Ajustes. */
+sealed class UpdateStatus {
+    data object Idle : UpdateStatus()
+    data object Checking : UpdateStatus()
+    data class Done(val result: UpdateCheck) : UpdateStatus()
+}
+
 class WeightViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = WeightRepository(application)
@@ -43,6 +52,21 @@ class WeightViewModel(application: Application) : AndroidViewModel(application) 
 
     /** State before the last undoable change. */
     private var undoState: AppState? = null
+
+    val installedVersion: String =
+        application.packageManager.getPackageInfo(application.packageName, 0).versionName ?: "?"
+
+    private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
+    val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
+
+    fun checkForUpdate() {
+        if (_updateStatus.value == UpdateStatus.Checking) return
+        viewModelScope.launch {
+            _updateStatus.value = UpdateStatus.Checking
+            val result = withContext(Dispatchers.IO) { UpdateChecker.fetch(installedVersion) }
+            _updateStatus.value = UpdateStatus.Done(result)
+        }
+    }
 
     private val loadJob = viewModelScope.launch {
         _state.value = withContext(Dispatchers.IO) { repository.load() }
