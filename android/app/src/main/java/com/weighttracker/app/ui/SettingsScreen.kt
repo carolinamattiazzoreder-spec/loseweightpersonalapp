@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -223,7 +224,7 @@ fun SettingsScreen(
                             if (result.notes.isNotBlank()) {
                                 Text(result.notes.lineSequence().first(), fontSize = 12.sp, color = WtColors.Muted, maxLines = 3)
                             }
-                            PrimaryPillButton("Baixar atualização") { open(result.downloadUrl) }
+                            PrimaryPillButton("Baixar atualização", onClick = { open(result.downloadUrl) })
                             Text(
                                 "Depois do download, abra o arquivo para instalar por cima. Seus registros continuam.",
                                 fontSize = 11.sp, fontWeight = FontWeight.Medium, color = WtColors.Muted,
