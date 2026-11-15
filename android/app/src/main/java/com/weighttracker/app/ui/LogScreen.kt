@@ -67,7 +67,7 @@ fun LogScreen(
     val weightValid = weight != null && weight in 20.0..300.0
     val existing = state.weights.firstOrNull { it.date == date }
     val newestFirst = remember(state.weights) { state.weights.reversed() }
-    val placeholder = state.weights.lastOrNull()?.weight?.let(::kg) ?: "78,4"
+    val placeholder = state.weights.lastOrNull()?.weight?.let(::kg) ?: "78,40"
 
     LazyColumn(
         modifier.fillMaxSize(),
