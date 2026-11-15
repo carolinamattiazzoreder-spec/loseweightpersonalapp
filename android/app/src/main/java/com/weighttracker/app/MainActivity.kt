@@ -6,6 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +59,7 @@ class MainActivity : ComponentActivity() {
 private fun WeightTrackerApp(vm: WeightViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val loaded by vm.loaded.collectAsStateWithLifecycle()
+    val updateStatus by vm.updateStatus.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(AppTab.Dashboard) }
     val snackbar = remember { SnackbarHostState() }
     val settingsActions = remember(vm) {
@@ -62,6 +69,7 @@ private fun WeightTrackerApp(vm: WeightViewModel = viewModel()) {
             exportCsv = vm::exportCsv,
             importJson = vm::importJson,
             clearEntries = vm::clearEntries,
+            checkUpdate = vm::checkForUpdate,
         )
     }
 
@@ -82,14 +90,26 @@ private fun WeightTrackerApp(vm: WeightViewModel = viewModel()) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center), color = WtColors.Primary)
             }
         } else {
-            when (tab) {
-                AppTab.Dashboard -> DashboardScreen(
-                    state,
-                    onOpenLog = { tab = AppTab.Log },
-                    onOpenSettings = { tab = AppTab.Settings },
-                )
-                AppTab.Log -> LogScreen(state, onSave = vm::addEntry, onDelete = vm::deleteEntry)
-                AppTab.Settings -> SettingsScreen(state, settingsActions)
+            AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    (fadeIn(tween(240)) + slideInVertically(tween(240)) { it / 24 }) togetherWith fadeOut(tween(160))
+                },
+                label = "tab",
+            ) { current ->
+                when (current) {
+                    AppTab.Dashboard -> DashboardScreen(
+                        state,
+                        onOpenLog = { tab = AppTab.Log },
+                        onOpenSettings = { tab = AppTab.Settings },
+                    )
+                    AppTab.Log -> LogScreen(state, onSave = vm::addEntry, onDelete = vm::deleteEntry)
+                    AppTab.Settings -> SettingsScreen(
+                        state, settingsActions,
+                        installedVersion = vm.installedVersion,
+                        updateStatus = updateStatus,
+                    )
+                }
             }
         }
     }

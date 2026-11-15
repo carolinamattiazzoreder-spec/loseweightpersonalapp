@@ -1,24 +1,29 @@
 package com.weighttracker.app.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -35,7 +40,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 private val PAD_RIGHT = 8.dp
-private val PAD_TOP = 22.dp
+private val PAD_TOP = 26.dp
 private val PAD_BOTTOM = 22.dp
 
 /** Data range of the "Evolução" chart: entries, projection and goal. */
@@ -84,7 +89,8 @@ private class ChartFrame(width: Float, height: Float, padRight: Float, val top: 
 
 /**
  * Weighings as dots, the smoothed trend line, a dotted projection at −1 kg/week
- * and the dashed goal line. Tap a dot to see its value.
+ * and the dashed goal line. The lines draw themselves in when the data changes;
+ * tap or drag across the chart to read a weighing.
  */
 @Composable
 fun WeightChart(
@@ -95,9 +101,26 @@ fun WeightChart(
     range: ChartRange,
     today: LocalDate,
     modifier: Modifier = Modifier,
+    selectedIndex: Int? = null,
+    onSelect: (Int?) -> Unit = {},
 ) {
     val textMeasurer = rememberTextMeasurer()
-    var selected by remember(weights) { mutableStateOf<Int?>(null) }
+    val pathMeasure = remember { PathMeasure() }
+
+    // 0 → 1 while the lines draw in. Read only in the draw phase, so the
+    // animation never recomposes the card.
+    val reveal = remember { Animatable(0f) }
+    LaunchedEffect(weights, goal) {
+        reveal.snapTo(0f)
+        reveal.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
+    }
+
+    /** Index of the weighing whose x position is closest to [x], for a plot area [plotWidth] wide. */
+    fun nearest(plotWidth: Float, x: Float): Int? {
+        if (plotWidth <= 0f) return null
+        val frame = ChartFrame(plotWidth, 1f, 0f, 0f, 0f, range)
+        return weights.indices.minByOrNull { abs(frame.x(weights[it].date) - x) }
+    }
 
     val axisStyle = TextStyle(color = WtColors.Muted, fontSize = 10.sp, fontWeight = FontWeight.Medium)
     val goalStyle = TextStyle(color = WtColors.Primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -109,16 +132,20 @@ fun WeightChart(
             .height(210.dp)
             .pointerInput(weights, range) {
                 detectTapGestures { tap ->
-                    val frame = ChartFrame(
-                        size.width.toFloat(), size.height.toFloat(),
-                        PAD_RIGHT.toPx(), PAD_TOP.toPx(), PAD_BOTTOM.toPx(), range,
-                    )
-                    val nearest = weights.indices.minByOrNull { abs(frame.x(weights[it].date) - tap.x) }
-                    selected = if (nearest == selected) null else nearest
+                    val hit = nearest(size.width - PAD_RIGHT.toPx(), tap.x)
+                    onSelect(if (hit == selectedIndex) null else hit)
+                }
+            }
+            .pointerInput(weights, range) {
+                // Horizontal only, so the page still scrolls vertically over the chart.
+                detectHorizontalDragGestures { change, _ ->
+                    change.consume()
+                    onSelect(nearest(size.width - PAD_RIGHT.toPx(), change.position.x))
                 }
             }
     ) {
         val frame = ChartFrame(size.width, size.height, PAD_RIGHT.toPx(), PAD_TOP.toPx(), PAD_BOTTOM.toPx(), range)
+        val progress = reveal.value
 
         // Grid lines with values at the right edge
         var v = range.yMin
@@ -144,39 +171,76 @@ fun WeightChart(
             drawText(label, topLeft = Offset(frame.left, y + 3.dp.toPx()))
         }
 
-        // Weighings
         val dots = weights.map { Offset(frame.x(it.date), frame.y(it.weight)) }
-        dots.forEach { drawCircle(WtColors.Dots, 3.dp.toPx(), it) }
-
-        // Trend (smoothed with mid-point curves)
         val trendPts = trend.map { Offset(frame.x(it.date), frame.y(it.weight)) }
+
+        // Trend line (smoothed with mid-point curves), revealed along its length
+        val trendPath = Path()
         if (trendPts.size >= 2) {
-            val path = Path().apply {
-                moveTo(trendPts[0].x, trendPts[0].y)
-                for (i in 1 until trendPts.size) {
-                    val p0 = trendPts[i - 1]
-                    val p1 = trendPts[i]
-                    val midX = (p0.x + p1.x) / 2
-                    cubicTo(midX, p0.y, midX, p1.y, p1.x, p1.y)
-                }
+            trendPath.moveTo(trendPts[0].x, trendPts[0].y)
+            for (i in 1 until trendPts.size) {
+                val p0 = trendPts[i - 1]
+                val p1 = trendPts[i]
+                val midX = (p0.x + p1.x) / 2
+                trendPath.cubicTo(midX, p0.y, midX, p1.y, p1.x, p1.y)
             }
-            drawPath(path, WtColors.Chart, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        pathMeasure.setPath(trendPath, false)
+        val trendLength = pathMeasure.length
+        val shown = Path()
+        pathMeasure.getSegment(0f, trendLength * progress, shown, true)
+
+        // Soft fill under the revealed part of the trend
+        if (trendPts.size >= 2 && progress > 0f) {
+            val revealX = trendPts.first().x + (trendPts.last().x - trendPts.first().x) * progress
+            clipRect(right = revealX) {
+                val area = Path().apply {
+                    addPath(trendPath)
+                    lineTo(trendPts.last().x, frame.bottom)
+                    lineTo(trendPts.first().x, frame.bottom)
+                    close()
+                }
+                drawPath(
+                    area,
+                    Brush.verticalGradient(
+                        listOf(WtColors.Chart.copy(alpha = 0.18f), WtColors.Chart.copy(alpha = 0f)),
+                        startY = frame.top,
+                        endY = frame.bottom,
+                    ),
+                )
+            }
         }
 
-        // Projection: from the end of the trend to the goal
+        // Weighings pop in as the line passes them
+        val firstX = dots.first().x
+        val lastX = dots.last().x
+        dots.forEach { p ->
+            val at = if (lastX > firstX) (p.x - firstX) / (lastX - firstX) else 0f
+            val pop = ((progress - at) / 0.12f).coerceIn(0f, 1f)
+            if (pop > 0f) drawCircle(WtColors.Dots, 3.dp.toPx() * pop, p)
+        }
+
+        drawPath(shown, WtColors.Chart, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Projection: from the end of the trend to the goal, after the trend is drawn
         val trendEnd = trendPts.lastOrNull()
-        if (trendEnd != null && projection.size >= 2) {
+        val projProgress = ((progress - 0.85f) / 0.15f).coerceIn(0f, 1f)
+        if (trendEnd != null && projection.size >= 2 && projProgress > 0f) {
             val end = projection.last()
             val endPt = Offset(frame.x(end.date), frame.y(end.weight))
+            val tip = Offset(
+                trendEnd.x + (endPt.x - trendEnd.x) * projProgress,
+                trendEnd.y + (endPt.y - trendEnd.y) * projProgress,
+            )
             drawLine(
-                WtColors.Projection, trendEnd, endPt,
+                WtColors.Projection, trendEnd, tip,
                 strokeWidth = 2.5.dp.toPx(),
                 cap = StrokeCap.Round,
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 6.dp.toPx())),
             )
-            drawCircle(WtColors.Projection, 5.dp.toPx(), endPt)
+            if (projProgress >= 1f) drawCircle(WtColors.Projection, 5.dp.toPx(), endPt)
         }
-        if (trendEnd != null) {
+        if (trendEnd != null && progress >= 1f) {
             drawCircle(Color.White, 6.dp.toPx(), trendEnd)
             drawCircle(WtColors.Chart, 6.dp.toPx(), trendEnd, style = Stroke(3.dp.toPx()))
         }
@@ -202,10 +266,11 @@ fun WeightChart(
             }
         }
 
-        // Tooltip for the tapped weighing
-        selected?.takeIf { it in weights.indices }?.let { i ->
+        // Tooltip for the selected weighing
+        selectedIndex?.takeIf { it in weights.indices }?.let { i ->
             val p = dots[i]
             drawLine(WtColors.Dots, Offset(p.x, frame.top), Offset(p.x, frame.bottom), strokeWidth = 1.dp.toPx())
+            drawCircle(Color.White, 7.dp.toPx(), p)
             drawCircle(WtColors.Chart, 5.dp.toPx(), p)
             val text = textMeasurer.measure("${kg(weights[i].weight)} kg · ${PtDate.dayMonth(weights[i].date)}", tooltipStyle)
             val padH = 8.dp.toPx()

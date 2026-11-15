@@ -67,16 +67,39 @@ class AnalyticsTest {
     }
 
     @Test
-    fun milestonesEveryTwoKgDownToGoal() {
-        val result = milestones(start = 85.0, goal = 72.0, current = 78.4)
-        assertEquals(listOf(84.0, 82.0, 80.0, 78.0, 76.0, 74.0, 72.0), result.map { it.weight })
-        assertEquals(3, result.count { it.reached })
+    fun milestonesEveryFiveKgDownToGoal() {
+        val result = milestones(start = 85.0, goal = 70.0, current = 78.4)
+        assertEquals(listOf(80.0, 75.0, 70.0), result.map { it.weight })
+        assertEquals(1, result.count { it.reached })
         assertEquals(true, result.last().isGoal)
     }
 
     @Test
-    fun milestonesUseBiggerStepsForBigGoals() {
+    fun milestonesEndAtAGoalOffTheGrid() {
+        assertEquals(listOf(80.0, 75.0, 72.0), milestones(85.0, 72.0, 85.0).map { it.weight })
         assertEquals(listOf(90.0, 85.0, 80.0, 75.0, 70.0, 65.0), milestones(95.0, 65.0, 95.0).map { it.weight })
+    }
+
+    @Test
+    fun milestonesUseTenKgStepsForHugeGoals() {
+        assertEquals(listOf(140.0, 130.0, 120.0, 110.0, 100.0, 90.0, 80.0, 75.0), milestones(150.0, 75.0, 150.0).map { it.weight })
+    }
+
+    @Test
+    fun periodKeepsRecentEntriesButAtLeastTwo() {
+        val weights = listOf(entry("2026-01-01", 90.0), entry("2026-09-01", 82.0), entry("2026-10-01", 80.0))
+        assertEquals(2, periodWeights(weights, 30).size)
+        assertEquals(listOf(82.0, 80.0), periodWeights(weights, 7).map { it.weight })
+        assertEquals(3, periodWeights(weights, null).size)
+    }
+
+    @Test
+    fun periodSummaryHasMinMaxAverageAndChange() {
+        val summary = periodSummary(listOf(entry("2026-10-01", 80.0), entry("2026-10-02", 79.5), entry("2026-10-03", 79.75)))!!
+        assertEquals(79.5, summary.min, 0.0)
+        assertEquals(80.0, summary.max, 0.0)
+        assertEquals(79.75, summary.average, 1e-9)
+        assertEquals(-0.25, summary.change, 1e-9)
     }
 
     @Test

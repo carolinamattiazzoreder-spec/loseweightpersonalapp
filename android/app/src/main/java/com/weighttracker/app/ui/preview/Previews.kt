@@ -19,7 +19,7 @@ fun AppPreview(tab: AppTab, state: AppState = SampleData.state) {
             when (tab) {
                 AppTab.Dashboard -> DashboardScreen(state, onOpenLog = {}, onOpenSettings = {}, today = SampleData.today)
                 AppTab.Log -> LogScreen(state, onSave = { _, _, _ -> }, onDelete = {}, today = SampleData.today)
-                AppTab.Settings -> SettingsScreen(state, SettingsActions())
+                AppTab.Settings -> SettingsScreen(state, SettingsActions(), installedVersion = "1.5")
             }
         }
     }

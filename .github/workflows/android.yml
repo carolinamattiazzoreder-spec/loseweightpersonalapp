@@ -47,15 +47,17 @@ jobs:
           name: WeightTracker-apk
           path: android/app/build/WeightTracker.apk
 
-      # Direct download link for phones: Releases → "WeightTracker APK (latest)"
+      # Newest build of any branch (pre-release). The versioned releases below
+      # are the "latest" ones the app's update check looks at.
       - name: Publish APK to GitHub Releases
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest
           target_commitish: ${{ github.sha }}
-          name: WeightTracker APK (latest)
-          make_latest: true
+          name: WeightTracker APK (latest build)
+          prerelease: true
+          make_latest: false
           files: android/app/build/WeightTracker.apk
           body: |
             Latest build of the WeightTracker Android app (commit ${{ github.sha }}, branch ${{ github.ref_name }}).
@@ -71,7 +73,7 @@ jobs:
           tag_name: v${{ steps.version.outputs.name }}
           target_commitish: ${{ github.sha }}
           name: WeightTracker ${{ steps.version.outputs.name }}
-          make_latest: false
+          make_latest: true
           files: android/app/build/WeightTracker.apk
           body: |
             WeightTracker ${{ steps.version.outputs.name }} for Android (commit ${{ github.sha }}).
