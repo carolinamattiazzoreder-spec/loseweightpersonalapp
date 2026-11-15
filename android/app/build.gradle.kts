@@ -17,8 +17,8 @@ android {
         applicationId = "com.weighttracker.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 6
+        versionName = "1.5"
     }
 
     // One fixed key for every build, so a new APK installs as an update of the

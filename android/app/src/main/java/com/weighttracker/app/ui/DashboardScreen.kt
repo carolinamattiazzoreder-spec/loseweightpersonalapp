@@ -59,6 +59,24 @@ import com.weighttracker.app.ui.theme.WtColors
 import java.time.LocalDate
 import java.time.YearMonth
 import kotlin.math.ceil
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.StrokeCap
+import com.weighttracker.app.data.periodSummary
+import com.weighttracker.app.data.periodWeights
+import java.time.temporal.ChronoUnit
 
 @Composable
 fun DashboardScreen(
@@ -69,26 +87,32 @@ fun DashboardScreen(
     today: LocalDate = LocalDate.now(),
 ) {
     val stats = remember(state) { computeStats(state) }
+    val entrance = remember { Entrance() }
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        item { Greeting(userName(state), today, onOpenSettings) }
+        var position = 0
+        fun card(content: @Composable () -> Unit) {
+            val index = position++
+            item { Appear(index, entrance) { content() } }
+        }
+        card { Greeting(userName(state), today, onOpenSettings) }
         if (stats == null) {
-            item { EmptyCard(onOpenLog) }
+            card { EmptyCard(onOpenLog) }
             return@LazyColumn
         }
-        item { HeroCard(stats, today) }
-        item { GoalEtaCard(stats, today, onOpenSettings) }
+        card { HeroCard(stats, today) }
+        card { GoalEtaCard(stats, today, onOpenSettings) }
         if (stats.goal != null && stats.goal < stats.start) {
-            item { MilestonesCard(stats.start, stats.goal, stats.current) }
+            card { MilestonesCard(stats.start, stats.goal, stats.current) }
         }
         if (state.weights.size >= 2) {
-            item { EvolutionCard(state, today) }
+            card { EvolutionCard(state, today) }
         }
-        item { MonthCard(state, today) }
-        item { RecentCard(state, stats, onOpenLog) }
+        card { MonthCard(state, today) }
+        card { RecentCard(state, stats, onOpenLog) }
     }
 }
 
@@ -172,7 +196,9 @@ private fun HeroCard(stats: DashboardStats, today: LocalDate) {
                 }
             }
             Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.Bottom) {
-                Text(kg(stats.current), color = onHero, fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.8).sp, lineHeight = 46.sp)
+                AnimatedNumber(stats.current) {
+                    Text(kg(it), color = onHero, fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.8).sp, lineHeight = 46.sp)
+                }
                 Text(" kg", color = onHero.copy(alpha = 0.85f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 7.dp))
             }
             stats.weeklyChange?.let { w ->
@@ -191,15 +217,12 @@ private fun HeroCard(stats: DashboardStats, today: LocalDate) {
                 stats.goal?.let { Text("Meta ${kg(it)} kg", color = onHero.copy(alpha = 0.85f), fontSize = 12.sp) }
             }
             if (stats.goal != null && stats.progressPercent != null) {
-                Box(
-                    Modifier.padding(top = 8.dp).fillMaxWidth().height(9.dp).clip(RoundedCornerShape(999.dp))
-                        .background(onHero.copy(alpha = 0.22f))
-                ) {
-                    Box(
-                        Modifier.fillMaxWidth(stats.progressPercent / 100f).fillMaxHeight()
-                            .clip(RoundedCornerShape(999.dp)).background(WtColors.Mint)
-                    )
-                }
+                AnimatedProgressBar(
+                    stats.progressPercent,
+                    track = onHero.copy(alpha = 0.22f),
+                    fill = WtColors.Mint,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                     val lostText = if (stats.lost >= 0) "${kg(stats.lost)} kg perdidos" else "${kg(-stats.lost)} kg ganhos"
                     Text("$lostText · ${stats.progressPercent}%", color = onHero, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -280,6 +303,11 @@ private fun MilestonesCard(start: Double, goal: Double, current: Double) {
             Pill("$reached de ${items.size}", WtColors.Mint, WtColors.MintInk)
         }
         val lastReached = items.indexOfLast { it.reached }
+        val filled by animateFloatAsState(
+            if (lastReached > 0 && items.size > 1) lastReached.toFloat() / (items.size - 1) else 0f,
+            tween(900, easing = FastOutSlowInEasing),
+            label = "marcos",
+        )
         Row(
             Modifier
                 .fillMaxWidth()
@@ -287,10 +315,10 @@ private fun MilestonesCard(start: Double, goal: Double, current: Double) {
                     val half = 15.dp.toPx()
                     val y = 14.dp.toPx()
                     val stroke = 3.dp.toPx()
-                    drawLine(WtColors.Line, Offset(half, y), Offset(size.width - half, y), stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                    if (lastReached > 0 && items.size > 1) {
-                        val x = half + (size.width - 2 * half) * lastReached / (items.size - 1)
-                        drawLine(WtColors.Success, Offset(half, y), Offset(x, y), stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawLine(WtColors.Line, Offset(half, y), Offset(size.width - half, y), stroke, cap = StrokeCap.Round)
+                    if (filled > 0f) {
+                        val x = half + (size.width - 2 * half) * filled
+                        drawLine(WtColors.Success, Offset(half, y), Offset(x, y), stroke, cap = StrokeCap.Round)
                     }
                 },
             horizontalArrangement = if (items.size > 1) Arrangement.SpaceBetween else Arrangement.Center,
@@ -298,13 +326,16 @@ private fun MilestonesCard(start: Double, goal: Double, current: Double) {
             items.forEachIndexed { i, m ->
                 val isNext = i == nextIndex
                 Column(Modifier.width(30.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    var circle = Modifier.size(28.dp).clip(CircleShape).background(
+                    val circleColor by animateColorAsState(
                         when {
                             m.reached -> WtColors.Success
                             isNext -> WtColors.Surface
                             else -> WtColors.Cell
-                        }
+                        },
+                        tween(500),
+                        label = "marco",
                     )
+                    var circle = Modifier.size(28.dp).clip(CircleShape).background(circleColor)
                     if (isNext) circle = circle.border(3.dp, WtColors.Success, CircleShape)
                     Box(circle, contentAlignment = Alignment.Center) {
                         Text(
@@ -334,13 +365,32 @@ private fun MilestonesCard(start: Double, goal: Double, current: Double) {
     }
 }
 
+/** How much of the history the "Evolução" chart shows. */
+private enum class Period(val label: String, val days: Long?) {
+    Week("7d", 7), Month("30d", 30), Quarter("90d", 90), All("Tudo", null),
+}
+
 @Composable
 private fun EvolutionCard(state: AppState, today: LocalDate) {
-    val weights = state.weights
+    val all = state.weights
     val goal = state.goalWeight
-    val trend = remember(weights) { trendLine(weights) }
-    val projection = remember(weights, goal) { goalProjection(weights, goal) }
+    val spanDays = ChronoUnit.DAYS.between(all.first().date, all.last().date)
+    val periods = remember(spanDays) { Period.entries.filter { it.days == null || it.days < spanDays } }
+    var chosen by rememberSaveable { mutableStateOf(Period.All) }
+    val period = if (chosen in periods) chosen else Period.All
+
+    val weights = remember(all, period) { periodWeights(all, period.days) }
+    val trend = remember(all, weights) { trendLine(all).filter { it.date >= weights.first().date } }
+    val projection = remember(weights, goal, period) {
+        val full = goalProjection(weights, goal)
+        val days = period.days
+        if (days == null || full.size < 2 || ChronoUnit.DAYS.between(full.first().date, full.last().date) <= days) full
+        else emptyList()
+    }
     val range = remember(weights, goal, projection) { ChartRange.of(weights, goal, projection) }
+    val summary = remember(weights) { periodSummary(weights) }
+    var selected by remember(weights) { mutableStateOf<Int?>(null) }
+
     WtCard(spacing = 10.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CardTitle("Evolução", Modifier.weight(1f))
@@ -349,7 +399,57 @@ private fun EvolutionCard(state: AppState, today: LocalDate) {
                 fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = WtColors.Muted,
             )
         }
-        WeightChart(weights, trend, projection, goal, range, today)
+        if (periods.size > 1) {
+            PillTabs(periods, period, label = { it.label }, onSelect = { chosen = it })
+        }
+        WeightChart(weights, trend, projection, goal, range, today, selectedIndex = selected, onSelect = { selected = it })
+        AnimatedContent(
+            targetState = selected,
+            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+            label = "readout",
+        ) { i ->
+            val entry = i?.let { weights.getOrNull(it) }
+            if (entry == null) {
+                Text(
+                    "Toque ou arraste no gráfico para ver uma pesagem",
+                    Modifier.fillMaxWidth(), fontSize = 11.sp, color = WtColors.Subtle, textAlign = TextAlign.Center,
+                )
+            } else {
+                val previous = all.indexOf(entry).let { if (it > 0) all[it - 1] else null }
+                val delta = previous?.let { entry.weight - it.weight }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${PtDate.title(entry.date)} · ${kg(entry.weight)} kg",
+                        fontSize = 12.sp, fontWeight = FontWeight.Bold, color = WtColors.Ink,
+                    )
+                    if (delta != null) {
+                        val tone = when {
+                            delta <= -0.005 -> Tone(WtColors.Mint, WtColors.MintInk)
+                            delta >= 0.005 -> Tone(WtColors.Rose, WtColors.RoseInk)
+                            else -> Tone(WtColors.Line, WtColors.Ink2)
+                        }
+                        Pill("${kgSigned(delta)} kg vs. anterior", tone.bg, tone.fg)
+                    }
+                }
+            }
+        }
+        summary?.let { sm ->
+            val changeTone = when {
+                sm.change <= -0.005 -> Tone(WtColors.Mint, WtColors.MintInk)
+                sm.change >= 0.005 -> Tone(WtColors.Rose, WtColors.RoseInk)
+                else -> Tone(WtColors.Line, WtColors.Ink2)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatTile("Variação", sm.change, ::kgSigned, changeTone, Modifier.weight(1f))
+                StatTile("Média", sm.average, ::kg, Tone(WtColors.Sky, WtColors.SkyInk), Modifier.weight(1f))
+                StatTile("Mín.", sm.min, ::kg, Tone(WtColors.Teal, WtColors.TealInk), Modifier.weight(1f))
+                StatTile("Máx.", sm.max, ::kg, Tone(WtColors.Amber, WtColors.AmberInk), Modifier.weight(1f))
+            }
+        }
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
@@ -359,10 +459,16 @@ private fun EvolutionCard(state: AppState, today: LocalDate) {
             if (projection.isNotEmpty()) LegendLine(WtColors.Projection, "1 kg/sem")
             if (goal != null) LegendLine(WtColors.RoseStrong, "Meta")
         }
-        Text(
-            "Toque no gráfico para ver uma pesagem",
-            Modifier.fillMaxWidth(), fontSize = 11.sp, color = WtColors.Subtle, textAlign = TextAlign.Center,
-        )
+    }
+}
+
+@Composable
+private fun StatTile(label: String, value: Double, format: (Double) -> String, tone: Tone, modifier: Modifier) {
+    Column(modifier.clip(RoundedCornerShape(14.dp)).background(tone.bg).padding(horizontal = 10.dp, vertical = 8.dp)) {
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = tone.fg, maxLines = 1)
+        AnimatedNumber(value) {
+            Text(format(it), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tone.fg, maxLines = 1)
+        }
     }
 }
 
@@ -386,29 +492,44 @@ private fun LegendLine(color: Color, label: String) {
 private fun MonthCard(state: AppState, today: LocalDate) {
     val months = remember(state.weights, today) { monthsWithData(state.weights, today) }
     var index by rememberSaveable(months.size) { mutableIntStateOf(months.lastIndex) }
-    val month = months[index.coerceIn(0, months.lastIndex)]
-    val summary = remember(state.weights, month, today) { monthSummary(state.weights, month, today) }
     val thisMonth = YearMonth.from(today)
 
     WtCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MonthNavButton(WtIcons.ChevronLeft, "Mês anterior", enabled = index > 0) { index-- }
-            Text(
-                PtDate.monthYear(month), Modifier.weight(1f),
-                fontSize = 17.sp, fontWeight = FontWeight.Bold, color = WtColors.Ink, textAlign = TextAlign.Center,
-            )
+            AnimatedContent(
+                targetState = index.coerceIn(0, months.lastIndex),
+                modifier = Modifier.weight(1f),
+                transitionSpec = { monthSlide() },
+                label = "month-title",
+            ) { i ->
+                Text(
+                    PtDate.monthYear(months[i]), Modifier.fillMaxWidth(),
+                    fontSize = 17.sp, fontWeight = FontWeight.Bold, color = WtColors.Ink, textAlign = TextAlign.Center,
+                )
+            }
             MonthNavButton(WtIcons.ChevronRight, "Próximo mês", enabled = index < months.lastIndex) { index++ }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            MonthTile("No mês", summary.change?.let { "${kgSigned(it)} kg" } ?: "—", WtColors.Mint, WtColors.MintInk, WtColors.MintInk2, Modifier.weight(1f))
-            MonthTile("Média/sem.", summary.weeklyAverage?.let { "${kgSigned(it)} kg" } ?: "—", WtColors.Sky, WtColors.SkyInk, WtColors.SkyInk2, Modifier.weight(1f))
-            MonthTile(
-                "Pesagens",
-                if (month == thisMonth) "${summary.count} de ${summary.elapsedDays}" else summary.count.toString(),
-                WtColors.Amber, WtColors.AmberInk, WtColors.AmberInk2, Modifier.weight(1f),
-            )
+        AnimatedContent(
+            targetState = index.coerceIn(0, months.lastIndex),
+            transitionSpec = { monthSlide() },
+            label = "month",
+        ) { i ->
+            val month = months[i]
+            val summary = remember(state.weights, month, today) { monthSummary(state.weights, month, today) }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    MonthTile("No mês", summary.change?.let { "${kgSigned(it)} kg" } ?: "—", WtColors.Mint, WtColors.MintInk, WtColors.MintInk2, Modifier.weight(1f))
+                    MonthTile("Média/sem.", summary.weeklyAverage?.let { "${kgSigned(it)} kg" } ?: "—", WtColors.Sky, WtColors.SkyInk, WtColors.SkyInk2, Modifier.weight(1f))
+                    MonthTile(
+                        "Pesagens",
+                        if (month == thisMonth) "${summary.count} de ${summary.elapsedDays}" else summary.count.toString(),
+                        WtColors.Amber, WtColors.AmberInk, WtColors.AmberInk2, Modifier.weight(1f),
+                    )
+                }
+                CalendarGrid(month, summary.daysWeighed, today)
+            }
         }
-        CalendarGrid(month, summary.daysWeighed, today)
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(10.dp).clip(RoundedCornerShape(4.dp)).background(WtColors.Chart))
@@ -420,6 +541,13 @@ private fun MonthCard(state: AppState, today: LocalDate) {
             }
         }
     }
+}
+
+/** Slides the month content left when going forward, right when going back. */
+private fun AnimatedContentTransitionScope<Int>.monthSlide(): ContentTransform {
+    val forward = targetState > initialState
+    return (slideInHorizontally(tween(260)) { if (forward) it / 3 else -it / 3 } + fadeIn(tween(260))) togetherWith
+        (slideOutHorizontally(tween(200)) { if (forward) -it / 3 else it / 3 } + fadeOut(tween(200)))
 }
 
 @Composable

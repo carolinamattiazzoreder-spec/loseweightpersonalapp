@@ -101,11 +101,13 @@ fun trendLine(weights: List<WeightEntry>, alpha: Double = 0.3): List<ChartPoint>
 
 data class Milestone(val weight: Double, val reached: Boolean, val isGoal: Boolean)
 
-/** Round-number checkpoints from the start weight down to the goal (at most ~7). */
+/**
+ * Checkpoints every 5 kg below the start weight (80, 75, 70…), ending at the goal.
+ * Falls back to 10 kg steps when 5 kg would not fit in one row (more than 9).
+ */
 fun milestones(start: Double, goal: Double, current: Double): List<Milestone> {
     if (goal >= start) return emptyList()
-    val span = start - goal
-    val step = listOf(1.0, 2.0, 5.0, 10.0, 20.0).firstOrNull { span / it <= 7 } ?: 50.0
+    val step = if ((start - goal) / 5.0 <= 9) 5.0 else 10.0
     val values = mutableListOf<Double>()
     var v = floor((start - 1e-9) / step) * step
     while (v > goal + 1e-9) {
@@ -114,6 +116,27 @@ fun milestones(start: Double, goal: Double, current: Double): List<Milestone> {
     }
     values += goal
     return values.map { Milestone(it, current <= it + 1e-9, it == goal) }
+}
+
+/** Entries of the last [days] days (all with null); at least the last 2 entries. */
+fun periodWeights(weights: List<WeightEntry>, days: Long?): List<WeightEntry> {
+    if (days == null || weights.isEmpty()) return weights
+    val cutoff = weights.last().date.minusDays(days)
+    val inPeriod = weights.filter { it.date >= cutoff }
+    return if (inPeriod.size >= 2) inPeriod else weights.takeLast(2)
+}
+
+data class PeriodSummary(val min: Double, val max: Double, val average: Double, val change: Double)
+
+fun periodSummary(weights: List<WeightEntry>): PeriodSummary? {
+    if (weights.isEmpty()) return null
+    val values = weights.map { it.weight }
+    return PeriodSummary(
+        min = values.min(),
+        max = values.max(),
+        average = round2(values.average()),
+        change = round2(values.last() - values.first()),
+    )
 }
 
 data class MonthSummary(

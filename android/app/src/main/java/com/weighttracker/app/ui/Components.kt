@@ -1,6 +1,24 @@
 package com.weighttracker.app.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,6 +64,108 @@ import com.weighttracker.app.data.AppState
 import com.weighttracker.app.data.WeightEntry
 import com.weighttracker.app.ui.theme.Tone
 import com.weighttracker.app.ui.theme.WtColors
+
+// ── Motion ───────────────────────────────────────────────────────────────────
+
+/** Timing for the staggered entrance of a screen's cards. */
+class Entrance(private val stepMs: Long = 60) {
+    private val startedAt = System.currentTimeMillis()
+
+    /** Delay for the [index]-th card; cards composed later (after scrolling) get none. */
+    fun delayFor(index: Int): Long =
+        (index * stepMs - (System.currentTimeMillis() - startedAt)).coerceAtLeast(0L)
+}
+
+/** Fades and slides [content] up when it first appears. */
+@Composable
+fun Appear(index: Int, entrance: Entrance, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(entrance.delayFor(index))
+        progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
+    }
+    // Read in the draw phase so the animation never recomposes the content.
+    Box(
+        modifier.graphicsLayer {
+            alpha = progress.value
+            translationY = (1f - progress.value) * 20.dp.toPx()
+        }
+    ) {
+        content()
+    }
+}
+
+/** Counts from 0 to [value], and on to later values; [content] formats the running number. */
+@Composable
+fun AnimatedNumber(value: Double, durationMillis: Int = 800, content: @Composable (Double) -> Unit) {
+    val animated = remember { Animatable(0f) }
+    LaunchedEffect(value) {
+        animated.animateTo(value.toFloat(), tween(durationMillis, easing = FastOutSlowInEasing))
+    }
+    content(animated.value.toDouble())
+}
+
+/** Pill progress bar whose fill grows to [percent]. */
+@Composable
+fun AnimatedProgressBar(percent: Int, track: Color, fill: Color, modifier: Modifier = Modifier, height: Dp = 9.dp) {
+    val fraction = remember { Animatable(0f) }
+    LaunchedEffect(percent) {
+        fraction.animateTo(percent.coerceIn(0, 100) / 100f, tween(900, easing = FastOutSlowInEasing))
+    }
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(RoundedCornerShape(999.dp))
+            .background(track)
+            .drawBehind {
+                val w = size.width * fraction.value
+                if (w > 0f) drawRoundRect(fill, size = Size(w, size.height), cornerRadius = CornerRadius(size.height / 2))
+            }
+    )
+}
+
+/** Shrinks the control slightly while pressed. */
+@Composable
+fun Modifier.pressScale(interactionSource: MutableInteractionSource, pressed: Float = 0.96f): Modifier {
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        if (isPressed) pressed else 1f,
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "press",
+    )
+    return graphicsLayer { scaleX = scale; scaleY = scale }
+}
+
+/** Segmented pill selector; the highlight moves to the chosen option. */
+@Composable
+fun <T> PillTabs(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(WtColors.Cell)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        options.forEach { option ->
+            val active = option == selected
+            val bg by animateColorAsState(if (active) WtColors.Surface else Color.Transparent, tween(220), label = "tab-bg")
+            val fg by animateColorAsState(if (active) WtColors.Ink else WtColors.Muted, tween(220), label = "tab-fg")
+            val interaction = remember { MutableInteractionSource() }
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(bg)
+                    .clickable(interaction, indication = null) { onSelect(option) }
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(label(option), color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+        }
+    }
+}
 
 /** Name for the greeting: the one saved in Ajustes, else the app default. */
 @Composable
@@ -146,10 +266,12 @@ fun EntryRow(entry: WeightEntry, tone: Tone, modifier: Modifier = Modifier, trai
 
 @Composable
 fun PrimaryPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val interaction = remember { MutableInteractionSource() }
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().height(52.dp),
+        interactionSource = interaction,
+        modifier = modifier.fillMaxWidth().height(52.dp).pressScale(interaction),
         shape = RoundedCornerShape(999.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = WtColors.Primary,
@@ -165,9 +287,11 @@ fun PrimaryPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Mo
 /** Colored full-width button with a leading icon (Backup card). */
 @Composable
 fun TonalButton(text: String, icon: ImageVector, tone: Tone, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(52.dp),
+        interactionSource = interaction,
+        modifier = Modifier.fillMaxWidth().height(52.dp).pressScale(interaction),
         shape = RoundedCornerShape(18.dp),
         contentPadding = PaddingValues(horizontal = 16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = tone.bg, contentColor = tone.fg),

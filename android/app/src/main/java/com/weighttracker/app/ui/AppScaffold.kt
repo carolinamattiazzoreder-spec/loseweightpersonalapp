@@ -1,5 +1,11 @@
 package com.weighttracker.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -63,9 +69,16 @@ fun AppScaffold(
             }
         },
         floatingActionButton = {
-            if (tab == AppTab.Dashboard) {
+            AnimatedVisibility(
+                visible = tab == AppTab.Dashboard,
+                enter = scaleIn() + fadeIn(),
+                exit = scaleOut() + fadeOut(),
+            ) {
+                val interaction = remember { MutableInteractionSource() }
                 FloatingActionButton(
                     onClick = { onTabSelected(AppTab.Log) },
+                    modifier = Modifier.pressScale(interaction),
+                    interactionSource = interaction,
                     shape = CircleShape,
                     containerColor = WtColors.Primary,
                     contentColor = WtColors.OnPrimary,

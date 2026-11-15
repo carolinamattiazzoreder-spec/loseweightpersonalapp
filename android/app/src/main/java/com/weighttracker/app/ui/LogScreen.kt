@@ -1,6 +1,12 @@
 package com.weighttracker.app.ui
 
 import android.app.DatePickerDialog
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -108,11 +114,15 @@ fun LogScreen(
                     onValueChange = { note = it },
                     placeholder = "Ex.: após o treino, pesagem matinal…",
                 )
-                if (existing != null) {
-                    Text(
-                        "Substitui o registro de ${PtDate.dayMonth(existing.date)} (${kg(existing.weight)} kg).",
-                        fontSize = 12.sp, fontWeight = FontWeight.Medium, color = WtColors.AmberInk,
-                    )
+                // Keep the last text while the note animates out.
+                var replaceNote by remember { mutableStateOf("") }
+                existing?.let { replaceNote = "Substitui o registro de ${PtDate.dayMonth(it.date)} (${kg(it.weight)} kg)." }
+                AnimatedVisibility(
+                    visible = existing != null,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Text(replaceNote, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = WtColors.AmberInk)
                 }
                 PrimaryPillButton(
                     text = "Salvar registro",
@@ -134,7 +144,12 @@ fun LogScreen(
         }
         if (newestFirst.isNotEmpty()) {
             item {
-                WtCard(radius = 28.dp, padding = PaddingValues(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), spacing = 0.dp) {
+                WtCard(
+                    modifier = Modifier.animateContentSize(),
+                    radius = 28.dp,
+                    padding = PaddingValues(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                    spacing = 0.dp,
+                ) {
                     newestFirst.forEachIndexed { i, entry ->
                         EntryRow(entry, BadgeTones[i % BadgeTones.size], Modifier.padding(vertical = 4.dp)) {
                             Text("${kg(entry.weight)} kg", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = WtColors.Ink)
