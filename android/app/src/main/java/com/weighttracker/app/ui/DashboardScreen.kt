@@ -267,7 +267,7 @@ private fun GoalEtaCard(stats: DashboardStats, today: LocalDate, onOpenSettings:
                         PtDate.eta(eta, today), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold,
                         letterSpacing = (-0.6).sp, lineHeight = 38.sp, color = WtColors.RoseInk,
                     )
-                    Text("em $days dias · ${kg(weeks)} semanas", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = WtColors.Ink2)
+                    Text("em $days dias · ${dec1(weeks)} semanas", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = WtColors.Ink2)
                 }
                 val bars = ceil(weeks).toInt().coerceIn(1, 14)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -658,10 +658,10 @@ private fun RecentCard(state: AppState, stats: DashboardStats, onOpenLog: () -> 
         HorizontalDivider(Modifier.padding(top = 4.dp), color = WtColors.Line)
         Row(Modifier.padding(top = 10.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                (stats.bmi?.let { "IMC ${kg(it)} · " } ?: "") + "altura ${state.heightCm} cm",
+                (stats.bmi?.let { "IMC ${dec1(it)} · " } ?: "") + "altura ${state.heightCm} cm",
                 Modifier.weight(1f), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = WtColors.Muted,
             )
-            stats.bmiAtGoal?.let { Pill("Na meta: ${kg(it)}", WtColors.Amber, WtColors.AmberInk) }
+            stats.bmiAtGoal?.let { Pill("Na meta: ${dec1(it)}", WtColors.Amber, WtColors.AmberInk) }
         }
     }
 }

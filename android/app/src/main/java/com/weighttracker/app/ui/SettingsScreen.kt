@@ -141,7 +141,7 @@ fun SettingsScreen(
                     keyboardType = KeyboardType.Decimal,
                     isError = !goalValid,
                     errorText = "Entre 20 e 300 kg",
-                    placeholder = "72,0",
+                    placeholder = "72,00",
                     textStyle = fieldStyle,
                     modifier = Modifier.weight(1f),
                 )

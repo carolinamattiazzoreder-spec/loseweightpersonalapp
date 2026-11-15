@@ -9,13 +9,13 @@ import kotlin.math.abs
 
 private val PT_BR = Locale("pt", "BR")
 
-/** Weights keep up to 2 decimals: 76.85 → "76,85", 78.4 → "78,4", 80.0 → "80,0". */
-fun kg(value: Double): String {
-    val text = String.format(PT_BR, "%.2f", value)
-    return if (text.endsWith('0')) text.dropLast(1) else text
-}
+/** Weights always show 2 decimals: 76.85 → "76,85", 74.5 → "74,50". */
+fun kg(value: Double): String = String.format(PT_BR, "%.2f", value)
 
-/** −0.3 → "−0,3", 0.05 → "+0,05" (typographic minus). */
+/** One decimal, for values that are not weights (BMI, weeks): 27.1 → "27,1". */
+fun dec1(value: Double): String = String.format(PT_BR, "%.1f", value)
+
+/** −0.3 → "−0,30", 0.05 → "+0,05" (typographic minus). */
 fun kgSigned(value: Double): String {
     val sign = when {
         value <= -0.005 -> "−"
