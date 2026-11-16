@@ -12,7 +12,7 @@ App pessoal para acompanhar o peso até a meta. Existe em duas versões que usam
 
 **Baixar a versão mais recente:** página de [Releases](https://github.com/carolinamattiazzoreder-spec/loseweightpersonalapp/releases/latest) → `WeightTracker.apk`. Abra o arquivo no celular para instalar ou atualizar por cima.
 
-- **Painel** — peso atual com variação, progresso até a meta, data prevista de chegada (−1 kg/semana), Marcos a cada 5 kg, gráfico "Evolução" (7d / 30d / 90d / Tudo, com tendência, projeção e resumo), calendário do mês e últimos registros com IMC.
+- **Painel** — peso atual com variação, progresso até a meta, data prevista de chegada (−1 kg/semana), Marcos a cada 5 kg, gráfico "Evolução" (tendência de Holt, cone de previsão, marcos e meses no eixo; 7d / 30d / 90d / Tudo), calendário do mês e últimos registros com IMC.
 - **Registrar** — data, peso com até 2 casas decimais (aceita `76,85` ou `76.85`), nota, histórico com exclusão e "Desfazer".
 - **Ajustes** — nome, altura e meta; exportar backup (JSON/CSV) e importar; verificar atualização.
 
