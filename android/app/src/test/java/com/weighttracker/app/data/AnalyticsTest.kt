@@ -2,6 +2,7 @@ package com.weighttracker.app.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.YearMonth
@@ -60,13 +61,6 @@ class AnalyticsTest {
     }
 
     @Test
-    fun projectionGoesStraightToGoal() {
-        val points = goalProjection(listOf(entry("2026-10-04", 78.4)), 72.0)
-        assertEquals(listOf(78.4, 72.0), points.map { it.weight })
-        assertEquals(LocalDate.parse("2026-11-18"), points.last().date)
-    }
-
-    @Test
     fun milestonesEveryFiveKgDownToGoal() {
         val result = milestones(start = 85.0, goal = 70.0, current = 78.4)
         assertEquals(listOf(80.0, 75.0, 70.0), result.map { it.weight })
@@ -94,15 +88,6 @@ class AnalyticsTest {
     }
 
     @Test
-    fun periodSummaryHasMinMaxAverageAndChange() {
-        val summary = periodSummary(listOf(entry("2026-10-01", 80.0), entry("2026-10-02", 79.5), entry("2026-10-03", 79.75)))!!
-        assertEquals(79.5, summary.min, 0.0)
-        assertEquals(80.0, summary.max, 0.0)
-        assertEquals(79.75, summary.average, 1e-9)
-        assertEquals(-0.25, summary.change, 1e-9)
-    }
-
-    @Test
     fun monthSummaryComparesWithPreviousMonth() {
         val weights = listOf(entry("2026-09-26", 79.1), entry("2026-10-01", 79.0), entry("2026-10-03", 78.7), entry("2026-10-04", 78.4))
         val summary = monthSummary(weights, YearMonth.of(2026, 10), LocalDate.parse("2026-10-04"))
@@ -120,15 +105,62 @@ class AnalyticsTest {
     }
 
     @Test
-    fun trendSmoothsTowardsEntries() {
-        val trend = trendLine(listOf(entry("2026-10-01", 80.0), entry("2026-10-02", 70.0)))
-        assertEquals(80.0, trend[0].weight, 1e-9)
-        assertEquals(77.0, trend[1].weight, 1e-9)
-    }
-
-    @Test
     fun normalizeDedupesByDateLastWinsAndKeepsTwoDecimals() {
         val result = normalizeWeights(listOf(entry("2026-01-02", 80.04), entry("2026-01-01", 76.85), entry("2026-01-02", 79.964)))
         assertEquals(listOf(entry("2026-01-01", 76.85), entry("2026-01-02", 79.96)), result)
+    }
+
+    private fun steadyLoss(days: Int, every: Int = 1, perDay: Double = 0.1, start: Double = 90.0) =
+        (0..days step every).map { WeightEntry(LocalDate.parse("2026-08-01").plusDays(it.toLong()), round2(start - perDay * it)) }
+
+    @Test
+    fun holtFollowsASteadyLoss() {
+        val last = holtTrend(steadyLoss(60)).last()
+        assertEquals(84.0, last.level, 0.01)
+        assertEquals(-0.1, last.slope, 0.001)
+    }
+
+    @Test
+    fun holtHandlesSkippedDays() {
+        val last = holtTrend(steadyLoss(90, every = 3)).last()
+        assertEquals(81.0, last.level, 0.05)
+        assertEquals(-0.1, last.slope, 0.005)
+    }
+
+    @Test
+    fun holtIsFlatForAFlatWeight() {
+        val last = holtTrend((0..20).map { WeightEntry(LocalDate.parse("2026-08-01").plusDays(it.toLong()), 80.0) }).last()
+        assertEquals(80.0, last.level, 1e-9)
+        assertEquals(0.0, last.slope, 1e-9)
+    }
+
+    @Test
+    fun coneReachesTheGoalBetweenFastAndSlowPace() {
+        val weights = steadyLoss(60)
+        val cone = projectionCone(holtTrend(weights), goal = 80.0)!!
+        // ~84 kg losing ~0.1 kg/day → about 40 days after the last weigh-in
+        val expected = weights.last().date.plusDays(40)
+        assertTrue(!cone.fastDate.isAfter(expected.plusDays(2)))
+        assertTrue(!cone.slowDate!!.isBefore(expected.minusDays(2)))
+        assertTrue(!cone.fastDate.isAfter(cone.slowDate))
+        assertEquals(80.0, cone.levelAt(cone.fastSlope, cone.endDate), 1e-9)
+    }
+
+    @Test
+    fun noConeWithoutGoalAtGoalOrWhenGaining() {
+        val trend = holtTrend(steadyLoss(60))
+        assertNull(projectionCone(trend, null))
+        assertNull(projectionCone(trend, 90.0))
+        val gaining = holtTrend(steadyLoss(60, perDay = -0.1))
+        assertNull(projectionCone(gaining, 70.0))
+    }
+
+    @Test
+    fun crossingIsTheFirstDayTheTrendIsAtOrBelow() {
+        val trend = holtTrend(steadyLoss(60))
+        val crossed = firstCrossing(trend, 85.0)!!
+        assertTrue(trend.first { it.date == crossed }.level <= 85.0)
+        assertTrue(trend.filter { it.date.isBefore(crossed) }.all { it.level > 85.0 })
+        assertNull(firstCrossing(trend, 70.0))
     }
 }

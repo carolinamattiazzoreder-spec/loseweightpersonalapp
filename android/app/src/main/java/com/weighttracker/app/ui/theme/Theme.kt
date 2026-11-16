@@ -29,6 +29,8 @@ object WtColors {
     val PrimaryDeep = Color(0xFF082F49)
     val Chart = Color(0xFF0284C7)
     val Dots = Color(0xFF7DD3FC)
+    val DotsLight = Color(0xFFBAE6FD)
+    val MilestoneLine = Color(0xFF6EE7B7)
     val Projection = Color(0xFF14B8A6)
 
     val Line = Color(0xFFDDF3EE)

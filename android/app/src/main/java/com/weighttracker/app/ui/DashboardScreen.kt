@@ -48,11 +48,9 @@ import com.weighttracker.app.data.AppState
 import com.weighttracker.app.data.DashboardStats
 import com.weighttracker.app.data.computeStats
 import com.weighttracker.app.data.etaDate
-import com.weighttracker.app.data.goalProjection
 import com.weighttracker.app.data.milestones
 import com.weighttracker.app.data.monthSummary
 import com.weighttracker.app.data.monthsWithData
-import com.weighttracker.app.data.trendLine
 import com.weighttracker.app.ui.theme.BadgeTones
 import com.weighttracker.app.ui.theme.Tone
 import com.weighttracker.app.ui.theme.WtColors
@@ -74,7 +72,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.StrokeCap
-import com.weighttracker.app.data.periodSummary
+import com.weighttracker.app.data.firstCrossing
+import com.weighttracker.app.data.holtTrend
+import com.weighttracker.app.data.projectionCone
 import com.weighttracker.app.data.periodWeights
 import java.time.temporal.ChronoUnit
 
@@ -378,96 +378,65 @@ private fun EvolutionCard(state: AppState, today: LocalDate) {
     val periods = remember(spanDays) { Period.entries.filter { it.days == null || it.days < spanDays } }
     var chosen by rememberSaveable { mutableStateOf(Period.All) }
     val period = if (chosen in periods) chosen else Period.All
+    val longView = period.days == null || period.days >= 90
+
+    // "Meta" is on by default for long periods and off for 7/30 days, where the goal
+    // would squash the recent changes; a tap overrides it until the period changes.
+    var metaChoice by remember(period) { mutableStateOf<Boolean?>(null) }
+    val metaOn = goal != null && (metaChoice ?: longView)
 
     val weights = remember(all, period) { periodWeights(all, period.days) }
-    val trend = remember(all, weights) { trendLine(all).filter { it.date >= weights.first().date } }
-    val projection = remember(weights, goal, period) {
-        val full = goalProjection(weights, goal)
-        val days = period.days
-        if (days == null || full.size < 2 || ChronoUnit.DAYS.between(full.first().date, full.last().date) <= days) full
-        else emptyList()
+    val holtAll = remember(all) { holtTrend(all) }
+    val trend = remember(holtAll, weights) { holtAll.filter { !it.date.isBefore(weights.first().date) } }
+    val cone = remember(holtAll, goal, metaOn, longView) { if (metaOn && longView) projectionCone(holtAll, goal) else null }
+    val marks = remember(all, holtAll, goal) {
+        if (goal == null) emptyList()
+        else milestones(all.first().weight, goal, all.last().weight)
+            .filter { !it.isGoal }
+            .map { it.weight to firstCrossing(holtAll, it.weight) }
     }
-    val range = remember(weights, goal, projection) { ChartRange.of(weights, goal, projection) }
-    val summary = remember(weights) { periodSummary(weights) }
+    val deltas = remember(all, weights) {
+        val offset = all.size - weights.size
+        weights.indices.map { i -> (offset + i).takeIf { it > 0 }?.let { all[it].weight - all[it - 1].weight } }
+    }
     var selected by remember(weights) { mutableStateOf<Int?>(null) }
 
-    WtCard(spacing = 10.dp) {
+    WtCard(spacing = 12.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CardTitle("Evolução", Modifier.weight(1f))
             Text(
-                "${PtDate.dayMonth(weights.first().date)} – ${PtDate.dayMonth(range.endDate)}",
+                "${PtDate.dayMonth(weights.first().date)} – ${PtDate.dayMonth(chartEndDate(weights, cone))}",
                 fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = WtColors.Muted,
             )
         }
-        if (periods.size > 1) {
-            PillTabs(periods, period, label = { it.label }, onSelect = { chosen = it })
-        }
-        WeightChart(weights, trend, projection, goal, range, today, selectedIndex = selected, onSelect = { selected = it })
-        AnimatedContent(
-            targetState = selected,
-            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
-            label = "readout",
-        ) { i ->
-            val entry = i?.let { weights.getOrNull(it) }
-            if (entry == null) {
-                Text(
-                    "Toque ou arraste no gráfico para ver uma pesagem",
-                    Modifier.fillMaxWidth(), fontSize = 11.sp, color = WtColors.Subtle, textAlign = TextAlign.Center,
-                )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (periods.size > 1) {
+                PillTabs(periods, period, label = { it.label }, onSelect = { chosen = it }, modifier = Modifier.weight(1f))
             } else {
-                val previous = all.indexOf(entry).let { if (it > 0) all[it - 1] else null }
-                val delta = previous?.let { entry.weight - it.weight }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "${PtDate.title(entry.date)} · ${kg(entry.weight)} kg",
-                        fontSize = 12.sp, fontWeight = FontWeight.Bold, color = WtColors.Ink,
-                    )
-                    if (delta != null) {
-                        val tone = when {
-                            delta <= -0.005 -> Tone(WtColors.Mint, WtColors.MintInk)
-                            delta >= 0.005 -> Tone(WtColors.Rose, WtColors.RoseInk)
-                            else -> Tone(WtColors.Line, WtColors.Ink2)
-                        }
-                        Pill("${kgSigned(delta)} kg vs. anterior", tone.bg, tone.fg)
-                    }
-                }
+                Spacer(Modifier.weight(1f))
             }
+            if (goal != null) ToggleChip("Meta", metaOn) { metaChoice = !metaOn }
         }
-        summary?.let { sm ->
-            val changeTone = when {
-                sm.change <= -0.005 -> Tone(WtColors.Mint, WtColors.MintInk)
-                sm.change >= 0.005 -> Tone(WtColors.Rose, WtColors.RoseInk)
-                else -> Tone(WtColors.Line, WtColors.Ink2)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatTile("Variação", sm.change, ::kgSigned, changeTone, Modifier.weight(1f))
-                StatTile("Média", sm.average, ::kg, Tone(WtColors.Sky, WtColors.SkyInk), Modifier.weight(1f))
-                StatTile("Mín.", sm.min, ::kg, Tone(WtColors.Teal, WtColors.TealInk), Modifier.weight(1f))
-                StatTile("Máx.", sm.max, ::kg, Tone(WtColors.Amber, WtColors.AmberInk), Modifier.weight(1f))
-            }
-        }
+        WeightChart(
+            weights = weights,
+            deltas = deltas,
+            trend = trend,
+            goal = goal.takeIf { metaOn },
+            cone = cone,
+            milestones = marks,
+            periodDays = period.days,
+            selectedIndex = selected,
+            onSelect = { selected = it },
+        )
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         ) {
-            LegendDot(WtColors.Dots, "Pesagens")
-            LegendLine(WtColors.Chart, "Tendência")
-            if (projection.isNotEmpty()) LegendLine(WtColors.Projection, "1 kg/sem")
-            if (goal != null) LegendLine(WtColors.RoseStrong, "Meta")
-        }
-    }
-}
-
-@Composable
-private fun StatTile(label: String, value: Double, format: (Double) -> String, tone: Tone, modifier: Modifier) {
-    Column(modifier.clip(RoundedCornerShape(14.dp)).background(tone.bg).padding(horizontal = 10.dp, vertical = 8.dp)) {
-        Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = tone.fg, maxLines = 1)
-        AnimatedNumber(value) {
-            Text(format(it), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tone.fg, maxLines = 1)
+            LegendDot(WtColors.DotsLight, "Pesagens")
+            LegendLine(WtColors.Success, "Descendo")
+            LegendLine(WtColors.RoseStrong, "Subindo")
+            if (cone != null) LegendDot(WtColors.Projection.copy(alpha = 0.35f), "Previsão")
+            if (marks.isNotEmpty()) LegendLine(WtColors.MilestoneLine, "Marcos")
         }
     }
 }

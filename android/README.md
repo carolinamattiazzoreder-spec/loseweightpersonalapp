@@ -8,7 +8,7 @@ O visual segue o canvas **Design** (fundo menta, azul profundo, fonte Figtree, t
 
 | Aba | Conteúdo |
 |---|---|
-| **Painel** | Cards entram animados; saudação com a data; cartão do peso (variação vs. anterior e na semana, progresso até a meta); "Quando chego na meta" (data prevista a −1 kg/semana e linha do tempo); gráfico "Evolução" com períodos 7d / 30d / 90d / Tudo, resumo (variação, média, mín., máx.) e leitura ao tocar ou arrastar; Marcos a cada 5 kg; calendário do mês com resumo; últimos registros com IMC |
+| **Painel** | Cards entram animados; saudação com a data; cartão do peso (variação vs. anterior e na semana, progresso até a meta); "Quando chego na meta" (data prevista a −1 kg/semana e linha do tempo); gráfico "Evolução" com tendência de Holt (verde descendo, rosa subindo), meses no eixo, linhas dos Marcos, cone de previsão até a meta, períodos 7d / 30d / 90d / Tudo e leitura ao tocar ou arrastar; Marcos a cada 5 kg; calendário do mês com resumo; últimos registros com IMC |
 | **Registrar** | Data, peso (aceita `80,5` ou `80.5`), nota; histórico com exclusão; "DESFAZER" após salvar ou excluir |
 | **Ajustes** | Nome, altura e peso meta; backup (exportar JSON/CSV, importar JSON); armazenamento; verificar atualização; apagar todos os registros |
 

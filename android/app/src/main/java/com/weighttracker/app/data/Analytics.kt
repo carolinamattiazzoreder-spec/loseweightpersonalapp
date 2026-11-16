@@ -76,28 +76,69 @@ fun computeStats(state: AppState): DashboardStats? {
     )
 }
 
-data class ChartPoint(val date: LocalDate, val weight: Double)
+/** One step of the Holt trend: smoothed weight and its pace (kg per day; negative = losing). */
+data class HoltPoint(val date: LocalDate, val level: Double, val slope: Double)
 
-/** Straight line from the last entry to the goal at [rate] kg/week. */
-fun goalProjection(
-    weights: List<WeightEntry>,
-    goal: Double?,
-    rate: Double = PROJECTION_RATE_KG_PER_WEEK,
-): List<ChartPoint> {
-    if (goal == null || weights.isEmpty()) return emptyList()
-    val last = weights.last()
-    val weeks = weeksToGoal(last.weight, goal, rate) ?: return emptyList()
-    return listOf(ChartPoint(last.date, last.weight), ChartPoint(etaDate(weeks, last.date), goal))
-}
-
-/** Exponential moving average of the entries: the "Tendência" line. */
-fun trendLine(weights: List<WeightEntry>, alpha: Double = 0.3): List<ChartPoint> {
-    var trend = weights.firstOrNull()?.weight ?: return emptyList()
-    return weights.map {
-        trend += alpha * (it.weight - trend)
-        ChartPoint(it.date, trend)
+/**
+ * Holt's linear (double) exponential smoothing of the entries: a smoothed level plus a
+ * smoothed pace, so the trend follows a steady loss without lagging behind it. The pace
+ * is per day and the update is scaled by the gap between weigh-ins, so skipped days are
+ * fine. [alpha] weighs new weigh-ins against the level, [beta] new paces against the pace.
+ */
+fun holtTrend(weights: List<WeightEntry>, alpha: Double = 0.3, beta: Double = 0.1): List<HoltPoint> {
+    val first = weights.firstOrNull() ?: return emptyList()
+    var level = first.weight
+    var slope = 0.0
+    val points = mutableListOf(HoltPoint(first.date, level, slope))
+    for (i in 1 until weights.size) {
+        val days = ChronoUnit.DAYS.between(weights[i - 1].date, weights[i].date).coerceAtLeast(1).toDouble()
+        val predicted = level + slope * days
+        val newLevel = alpha * weights[i].weight + (1 - alpha) * predicted
+        slope = beta * (newLevel - level) / days + (1 - beta) * slope
+        level = newLevel
+        points += HoltPoint(weights[i].date, level, slope)
     }
+    return points
 }
+
+/**
+ * Where the trend could reach the goal: between the fastest and the slowest pace of the
+ * last weeks. [slowDate] is null when the slowest pace is not a loss.
+ */
+data class ProjectionCone(val start: HoltPoint, val goal: Double, val fastSlope: Double, val slowSlope: Double) {
+    private fun dateAt(slope: Double): LocalDate? =
+        if (slope < 0) start.date.plusDays(Math.round((start.level - goal) / -slope)) else null
+
+    val fastDate: LocalDate get() = dateAt(fastSlope)!!
+    val slowDate: LocalDate? get() = dateAt(slowSlope)
+    val midDate: LocalDate? get() = dateAt(start.slope)
+
+    /** Last date the chart shows: the slow edge's arrival, at most a year ahead. */
+    val endDate: LocalDate
+        get() {
+            val cap = start.date.plusDays(365)
+            val end = slowDate ?: fastDate.plusDays(ChronoUnit.DAYS.between(start.date, fastDate))
+            return if (end.isAfter(cap)) cap else end
+        }
+
+    /** Trend level at [date] when losing at [slope] kg/day, never below the goal. */
+    fun levelAt(slope: Double, date: LocalDate): Double =
+        maxOf(goal, start.level + slope * ChronoUnit.DAYS.between(start.date, date))
+}
+
+/** Pace range of the last [windowDays] days; null without a goal, at the goal, or when not losing at all. */
+fun projectionCone(trend: List<HoltPoint>, goal: Double?, windowDays: Long = 28): ProjectionCone? {
+    val last = trend.lastOrNull() ?: return null
+    if (goal == null || last.level <= goal) return null
+    val recent = trend.filter { it.date.isAfter(last.date.minusDays(windowDays)) }.map { it.slope }
+    val fast = recent.min()
+    if (fast >= 0) return null
+    return ProjectionCone(last, goal, fast, recent.max())
+}
+
+/** First date the trend reached [weight] or less. */
+fun firstCrossing(trend: List<HoltPoint>, weight: Double): LocalDate? =
+    trend.firstOrNull { it.level <= weight + 1e-9 }?.date
 
 data class Milestone(val weight: Double, val reached: Boolean, val isGoal: Boolean)
 
@@ -124,19 +165,6 @@ fun periodWeights(weights: List<WeightEntry>, days: Long?): List<WeightEntry> {
     val cutoff = weights.last().date.minusDays(days)
     val inPeriod = weights.filter { it.date >= cutoff }
     return if (inPeriod.size >= 2) inPeriod else weights.takeLast(2)
-}
-
-data class PeriodSummary(val min: Double, val max: Double, val average: Double, val change: Double)
-
-fun periodSummary(weights: List<WeightEntry>): PeriodSummary? {
-    if (weights.isEmpty()) return null
-    val values = weights.map { it.weight }
-    return PeriodSummary(
-        min = values.min(),
-        max = values.max(),
-        average = round2(values.average()),
-        change = round2(values.last() - values.first()),
-    )
 }
 
 data class MonthSummary(

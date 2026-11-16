@@ -9,6 +9,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.LaunchedEffect
@@ -164,6 +166,25 @@ fun <T> PillTabs(options: List<T>, selected: T, label: (T) -> String, onSelect: 
                 Text(label(option), color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
+    }
+}
+
+/** On/off pill (e.g. "Meta" on the chart); dark when on. */
+@Composable
+fun ToggleChip(label: String, on: Boolean, onToggle: () -> Unit) {
+    val bg by animateColorAsState(if (on) WtColors.Ink else WtColors.Cell, tween(220), label = "chip-bg")
+    val fg by animateColorAsState(if (on) WtColors.OnPrimary else WtColors.Ink2, tween(220), label = "chip-fg")
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .pressScale(interaction)
+            .clip(RoundedCornerShape(999.dp))
+            .background(bg)
+            .toggleable(value = on, interactionSource = interaction, indication = null, role = Role.Switch) { onToggle() }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
 
