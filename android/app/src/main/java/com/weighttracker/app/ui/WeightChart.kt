@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -33,13 +34,17 @@ import com.weighttracker.app.data.ProjectionCone
 import com.weighttracker.app.data.WeightEntry
 import com.weighttracker.app.ui.theme.WtColors
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 
-private val PAD_TOP = 26.dp
+private val PAD_TOP = 34.dp
 private val PAD_BOTTOM = 22.dp
-private val Y_LABELS = 26.dp
+private val Y_LABELS = 30.dp
+
+/** Trend segments spanning a longer pause than this are drawn as a neutral dashed bridge. */
+private const val GAP_DAYS = 21L
 
 /** A label under the chart; [strong] marks the last weigh-in. */
 data class XTick(val date: LocalDate, val label: String, val strong: Boolean = false)
@@ -59,6 +64,8 @@ fun xTicks(start: LocalDate, end: LocalDate, periodDays: Long?, lastEntry: Local
         }
         return ticks.reversed()
     }
+    fun monthLabel(d: LocalDate) =
+        PtDate.month3(d) + if (d.monthValue == 1) " " + (d.year % 100).toString().padStart(2, '0') else ""
     val months = mutableListOf<LocalDate>()
     var m = start.withDayOfMonth(1)
     if (m.isBefore(start)) m = m.plusMonths(1)
@@ -66,19 +73,26 @@ fun xTicks(start: LocalDate, end: LocalDate, periodDays: Long?, lastEntry: Local
         months += m
         m = m.plusMonths(1)
     }
-    if (months.isEmpty()) {
-        return listOf(XTick(start, PtDate.dayMonth(start)), XTick(end, PtDate.dayMonth(end)))
-    }
     val step = maxOf(1, ceil(months.size / 7.0).toInt())
-    return months.filterIndexed { i, _ -> i % step == 0 }.map {
-        XTick(it, PtDate.month3(it) + if (it.monthValue == 1) " " + (it.year % 100).toString().padStart(2, '0') else "")
+    val ticks = months.filterIndexed { i, _ -> i % step == 0 }.map { XTick(it, monthLabel(it)) }
+    // A short window may hold one month start or none: name the month it starts in too.
+    return if (ticks.size < 2 && (ticks.isEmpty() || ticks.first().date != start)) {
+        listOf(XTick(start, monthLabel(start))) + ticks
+    } else {
+        ticks
     }
 }
 
-/** Last date on the chart: the cone's end when it is shown, else the last weigh-in. */
-fun chartEndDate(weights: List<WeightEntry>, cone: ProjectionCone?): LocalDate {
-    val last = weights.last().date
-    return cone?.endDate?.takeIf { it.isAfter(last) } ?: last
+/**
+ * Last date on the chart: the last weigh-in, or with a cone a stretch of future that
+ * takes at most about a third of the width (half the history shown, at least 3 weeks).
+ */
+fun chartEndDate(windowStart: LocalDate, lastEntry: LocalDate, cone: ProjectionCone?): LocalDate {
+    if (cone == null) return lastEntry
+    val history = ChronoUnit.DAYS.between(windowStart, lastEntry)
+    val cap = lastEntry.plusDays(maxOf(21L, history / 2))
+    val end = if (cone.endDate.isAfter(cap)) cap else cone.endDate
+    return if (end.isAfter(lastEntry)) end else lastEntry
 }
 
 private class ChartWindow(
@@ -89,8 +103,18 @@ private class ChartWindow(
     val step: Double,
 ) {
     companion object {
-        fun of(weights: List<WeightEntry>, goal: Double?, cone: ProjectionCone?): ChartWindow {
-            val values = weights.map { it.weight } + listOfNotNull(goal)
+        fun of(
+            weights: List<WeightEntry>,
+            trend: List<HoltPoint>,
+            goal: Double?,
+            cone: ProjectionCone?,
+            windowStart: LocalDate,
+            end: LocalDate,
+        ): ChartWindow {
+            val values = weights.map { it.weight } +
+                trend.filter { !it.date.isBefore(windowStart) }.map { it.level } +
+                listOfNotNull(goal) +
+                listOfNotNull(cone?.levelAt(cone.fastSlope, end), cone?.levelAt(cone.slowSlope, end))
             val lo = values.min()
             val hi = values.max()
             val span = hi - lo
@@ -101,8 +125,8 @@ private class ChartWindow(
                 span <= 60 -> 10.0
                 else -> 20.0
             }
-            val xMin = weights.first().date.toEpochDay()
-            val xMax = chartEndDate(weights, cone).toEpochDay()
+            val xMin = windowStart.toEpochDay()
+            val xMax = end.toEpochDay()
             return ChartWindow(
                 xMin = xMin,
                 xMax = if (xMax > xMin) xMax else xMin + 1,
@@ -131,12 +155,15 @@ private class ChartFrame(width: Float, height: Float, labels: Float, val top: Fl
  * and rose while going up, 5 kg milestone lines with a ring where the trend crossed them,
  * the goal line and the projection cone. The data draws in from the left when it changes;
  * tap or drag to read a weigh-in.
+ *
+ * [trend] may start one point before [windowStart] so the line enters from the edge.
  */
 @Composable
 fun WeightChart(
     weights: List<WeightEntry>,
     deltas: List<Double?>,
     trend: List<HoltPoint>,
+    windowStart: LocalDate,
     goal: Double?,
     cone: ProjectionCone?,
     milestones: List<Pair<Double, LocalDate?>>,
@@ -146,9 +173,13 @@ fun WeightChart(
     onSelect: (Int?) -> Unit = {},
 ) {
     val textMeasurer = rememberTextMeasurer()
-    val window = remember(weights, goal, cone) { ChartWindow.of(weights, goal, cone) }
+    val lastEntry = weights.last().date
+    val end = chartEndDate(windowStart, lastEntry, cone)
+    val window = remember(weights, trend, goal, cone, windowStart, end) {
+        ChartWindow.of(weights, trend, goal, cone, windowStart, end)
+    }
     val ticks = remember(window, periodDays) {
-        xTicks(LocalDate.ofEpochDay(window.xMin), LocalDate.ofEpochDay(window.xMax), periodDays, weights.last().date)
+        xTicks(LocalDate.ofEpochDay(window.xMin), LocalDate.ofEpochDay(window.xMax), periodDays, lastEntry)
     }
 
     // 0 → 1 while the data draws in from the left. Read only in the draw phase.
@@ -174,7 +205,8 @@ fun WeightChart(
     Canvas(
         modifier
             .fillMaxWidth()
-            .height(220.dp)
+            .height(230.dp)
+            .clipToBounds()
             .pointerInput(weights, window) {
                 detectTapGestures { tap ->
                     val hit = nearest(size.width - Y_LABELS.toPx(), tap.x)
@@ -193,13 +225,22 @@ fun WeightChart(
         val progress = reveal.value
         val hairline = 1.dp.toPx()
 
-        // Horizontal grid with values at the right edge
+        // Right-hand labels: milestones in green first, then the grid values that don't collide.
+        val visibleMilestones = milestones.filter { (w, _) -> w >= window.yMin && w <= window.yMax }
+        val taken = mutableListOf<Float>()
+        fun rightLabel(text: String, y: Float, style: TextStyle) {
+            val label = textMeasurer.measure(text, style)
+            drawText(label, topLeft = Offset(size.width - label.size.width, y - label.size.height / 2f))
+            taken += y
+        }
+        visibleMilestones.forEach { (w, _) -> rightLabel(kgShort(w), frame.y(w), milestoneStyle) }
+
+        // Horizontal grid
         var v = window.yMin
         while (v <= window.yMax + 1e-6) {
             val y = frame.y(v)
-            drawLine(WtColors.Line, Offset(frame.left, y), Offset(size.width, y), strokeWidth = hairline)
-            val label = textMeasurer.measure(kgShort(v), axisStyle)
-            drawText(label, topLeft = Offset(size.width - label.size.width, y - label.size.height - hairline))
+            drawLine(WtColors.Line, Offset(frame.left, y), Offset(frame.right, y), strokeWidth = hairline)
+            if (taken.none { abs(it - y) < 12.dp.toPx() }) rightLabel(kgShort(v), y, axisStyle)
             v += window.step
         }
 
@@ -209,9 +250,9 @@ fun WeightChart(
         ticks.forEach { tick ->
             val x = frame.x(tick.date)
             if (x < frame.left - 1f || x > frame.right + 1f) return@forEach
-            drawLine(WtColors.Line, Offset(x, frame.top), Offset(x, frame.bottom), strokeWidth = hairline)
+            if (x > frame.left + 1f) drawLine(WtColors.Line, Offset(x, frame.top), Offset(x, frame.bottom), strokeWidth = hairline)
             val label = textMeasurer.measure(tick.label, if (tick.strong) strongAxisStyle else axisStyle)
-            val lx = (x - label.size.width / 2f).coerceIn(0f, maxOf(0f, size.width - label.size.width))
+            val lx = (x - label.size.width / 2f).coerceIn(0f, maxOf(0f, frame.right - label.size.width))
             if (lx > lastLabelEnd + 4.dp.toPx()) {
                 drawText(label, topLeft = Offset(lx, labelY))
                 lastLabelEnd = lx + label.size.width
@@ -220,58 +261,53 @@ fun WeightChart(
 
         // Milestone lines (5 kg)
         val dash = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 4.dp.toPx()))
-        milestones.forEach { (weight, _) ->
-            if (weight < window.yMin || weight > window.yMax) return@forEach
-            val y = frame.y(weight)
+        visibleMilestones.forEach { (w, _) ->
+            val y = frame.y(w)
             drawLine(WtColors.MilestoneLine, Offset(frame.left, y), Offset(frame.right, y), strokeWidth = hairline, pathEffect = dash)
-            val label = textMeasurer.measure(kgShort(weight), milestoneStyle)
-            val pad = 3.dp.toPx()
-            drawRoundRect(
-                WtColors.Surface,
-                topLeft = Offset(frame.left, y - label.size.height / 2f),
-                size = Size(label.size.width + pad * 2, label.size.height.toFloat()),
-                cornerRadius = CornerRadius(4.dp.toPx()),
-            )
-            drawText(label, topLeft = Offset(frame.left + pad, y - label.size.height / 2f))
         }
 
         // Goal line
-        if (goal != null) {
+        if (goal != null && goal >= window.yMin && goal <= window.yMax) {
             val y = frame.y(goal)
             drawLine(
                 WtColors.RoseStrong,
                 Offset(frame.left, y),
-                Offset(size.width, y),
+                Offset(frame.right, y),
                 strokeWidth = 1.5.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
             )
             val label = textMeasurer.measure("Meta ${kg(goal)} kg", goalStyle)
-            drawText(label, topLeft = Offset(frame.left, y + 3.dp.toPx()))
+            val above = y + 3.dp.toPx() + label.size.height > frame.bottom
+            drawText(label, topLeft = Offset(frame.left, if (above) y - label.size.height - 3.dp.toPx() else y + 3.dp.toPx()))
         }
 
         val dots = weights.map { Offset(frame.x(it.date), frame.y(it.weight)) }
         val trendPts = trend.map { Offset(frame.x(it.date), frame.y(it.level)) }
         val trendEnd = trendPts.lastOrNull()
 
-        // Projection cone, after the history has drawn in
+        // Projection cone, after the history has drawn in; cut at the chart's end.
         val coneAlpha = ((progress - 0.8f) / 0.2f).coerceIn(0f, 1f)
-        if (cone != null && trendEnd != null && coneAlpha > 0f) {
-            val end = cone.endDate
-            val gy = frame.y(cone.goal)
+        if (cone != null && trendEnd != null && coneAlpha > 0f && end.isAfter(lastEntry)) {
+            val ex = frame.x(end)
             val area = Path().apply {
                 moveTo(trendEnd.x, trendEnd.y)
-                lineTo(frame.x(cone.fastDate), gy)
-                lineTo(frame.x(end), gy)
-                lineTo(frame.x(end), frame.y(cone.levelAt(cone.slowSlope, end)))
+                if (cone.fastDate.isBefore(end)) {
+                    val gy = frame.y(cone.goal)
+                    lineTo(frame.x(cone.fastDate), gy)
+                    lineTo(ex, gy)
+                } else {
+                    lineTo(ex, frame.y(cone.levelAt(cone.fastSlope, end)))
+                }
+                lineTo(ex, frame.y(cone.levelAt(cone.slowSlope, end)))
                 close()
             }
             drawPath(area, WtColors.Projection.copy(alpha = 0.16f * coneAlpha))
-            cone.midDate?.let { mid ->
-                val midDate = if (mid.isAfter(end)) end else mid
+            if (cone.start.slope < 0) {
+                val mid = cone.midDate?.takeIf { it.isBefore(end) } ?: end
                 drawLine(
                     WtColors.Projection.copy(alpha = coneAlpha),
                     trendEnd,
-                    Offset(frame.x(midDate), frame.y(cone.levelAt(cone.start.slope, midDate))),
+                    Offset(frame.x(mid), frame.y(cone.levelAt(cone.start.slope, mid))),
                     strokeWidth = 2.dp.toPx(),
                     cap = StrokeCap.Round,
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 6.dp.toPx())),
@@ -280,12 +316,17 @@ fun WeightChart(
         }
 
         // History, revealed from the left
-        val revealX = frame.left + (trendPts.lastOrNull()?.x ?: frame.right) * progress + 6.dp.toPx()
-        clipRect(right = revealX) {
+        val revealX = frame.left + (trendEnd?.x ?: frame.right) * progress + 6.dp.toPx()
+        clipRect(left = -size.width, right = revealX) {
             dots.forEach { drawCircle(WtColors.DotsLight, 2.5.dp.toPx(), it) }
 
-            // Trend: green while going down, rose while going up
+            // Trend: green while going down, rose while going up, dashed across long pauses
             val stroke = Stroke(3.dp.toPx(), cap = StrokeCap.Round)
+            val bridge = Stroke(
+                2.dp.toPx(),
+                cap = StrokeCap.Round,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 5.dp.toPx())),
+            )
             for (i in 1 until trendPts.size) {
                 val p0 = trendPts[i - 1]
                 val p1 = trendPts[i]
@@ -294,16 +335,19 @@ fun WeightChart(
                     moveTo(p0.x, p0.y)
                     cubicTo(midX, p0.y, midX, p1.y, p1.x, p1.y)
                 }
-                val color = if (trend[i].level <= trend[i - 1].level) WtColors.Success else WtColors.RoseStrong
-                drawPath(segment, color, style = stroke)
+                val pause = ChronoUnit.DAYS.between(trend[i - 1].date, trend[i].date) > GAP_DAYS
+                when {
+                    pause -> drawPath(segment, WtColors.Muted.copy(alpha = 0.5f), style = bridge)
+                    trend[i].level <= trend[i - 1].level -> drawPath(segment, WtColors.Success, style = stroke)
+                    else -> drawPath(segment, WtColors.RoseStrong, style = stroke)
+                }
             }
 
             // Rings where the trend crossed a milestone
             val ringStroke = Stroke(2.dp.toPx())
-            milestones.forEach { (weight, crossed) ->
-                if (crossed == null || weight < window.yMin || weight > window.yMax) return@forEach
-                if (crossed.toEpochDay() < window.xMin || crossed.isAfter(weights.last().date)) return@forEach
-                val c = Offset(frame.x(crossed), frame.y(weight))
+            visibleMilestones.forEach { (w, crossed) ->
+                if (crossed == null || crossed.toEpochDay() < window.xMin || crossed.isAfter(lastEntry)) return@forEach
+                val c = Offset(frame.x(crossed), frame.y(w))
                 drawCircle(WtColors.Surface, 4.dp.toPx(), c)
                 drawCircle(WtColors.Good, 4.dp.toPx(), c, style = ringStroke)
             }

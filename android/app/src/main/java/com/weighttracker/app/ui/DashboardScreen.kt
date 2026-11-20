@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -370,6 +372,7 @@ private enum class Period(val label: String, val days: Long?) {
     Week("7d", 7), Month("30d", 30), Quarter("90d", 90), All("Tudo", null),
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EvolutionCard(state: AppState, today: LocalDate) {
     val all = state.weights
@@ -380,15 +383,25 @@ private fun EvolutionCard(state: AppState, today: LocalDate) {
     val period = if (chosen in periods) chosen else Period.All
     val longView = period.days == null || period.days >= 90
 
-    // "Meta" is on by default for long periods and off for 7/30 days, where the goal
-    // would squash the recent changes; a tap overrides it until the period changes.
+    // The goal line is on by default only for "Tudo": elsewhere a far goal would squash
+    // the recent changes. A tap overrides it until the period changes.
     var metaChoice by remember(period) { mutableStateOf<Boolean?>(null) }
-    val metaOn = goal != null && (metaChoice ?: longView)
+    val metaOn = goal != null && (metaChoice ?: (period == Period.All))
 
     val weights = remember(all, period) { periodWeights(all, period.days) }
+    // The axis covers the whole period, not just from the first weigh-in in it.
+    val windowStart = remember(weights, period) {
+        val first = weights.first().date
+        val periodStart = period.days?.let { all.last().date.minusDays(it) }
+        if (periodStart != null && periodStart.isBefore(first)) periodStart else first
+    }
     val holtAll = remember(all) { holtTrend(all) }
-    val trend = remember(holtAll, weights) { holtAll.filter { !it.date.isBefore(weights.first().date) } }
-    val cone = remember(holtAll, goal, metaOn, longView) { if (metaOn && longView) projectionCone(holtAll, goal) else null }
+    // Keep one point before the window so the line enters from the left edge.
+    val trend = remember(holtAll, windowStart) {
+        val firstInside = holtAll.indexOfFirst { !it.date.isBefore(windowStart) }.coerceAtLeast(0)
+        holtAll.subList(maxOf(0, firstInside - 1), holtAll.size)
+    }
+    val cone = remember(holtAll, goal, longView) { if (longView) projectionCone(holtAll, goal) else null }
     val marks = remember(all, holtAll, goal) {
         if (goal == null) emptyList()
         else milestones(all.first().weight, goal, all.last().weight)
@@ -405,7 +418,7 @@ private fun EvolutionCard(state: AppState, today: LocalDate) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CardTitle("Evolução", Modifier.weight(1f))
             Text(
-                "${PtDate.dayMonth(weights.first().date)} – ${PtDate.dayMonth(chartEndDate(weights, cone))}",
+                "${PtDate.dayMonth(windowStart)} – ${PtDate.dayMonth(chartEndDate(windowStart, all.last().date, cone))}",
                 fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = WtColors.Muted,
             )
         }
@@ -421,6 +434,7 @@ private fun EvolutionCard(state: AppState, today: LocalDate) {
             weights = weights,
             deltas = deltas,
             trend = trend,
+            windowStart = windowStart,
             goal = goal.takeIf { metaOn },
             cone = cone,
             milestones = marks,
@@ -428,9 +442,10 @@ private fun EvolutionCard(state: AppState, today: LocalDate) {
             selectedIndex = selected,
             onSelect = { selected = it },
         )
-        Row(
+        FlowRow(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             LegendDot(WtColors.DotsLight, "Pesagens")
             LegendLine(WtColors.Success, "Descendo")
@@ -445,7 +460,7 @@ private fun EvolutionCard(state: AppState, today: LocalDate) {
 private fun LegendDot(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = WtColors.Ink2)
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = WtColors.Ink2, maxLines = 1, softWrap = false)
     }
 }
 
@@ -453,7 +468,7 @@ private fun LegendDot(color: Color, label: String) {
 private fun LegendLine(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(Modifier.width(14.dp).height(3.dp).clip(RoundedCornerShape(2.dp)).background(color))
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = WtColors.Ink2)
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = WtColors.Ink2, maxLines = 1, softWrap = false)
     }
 }
 

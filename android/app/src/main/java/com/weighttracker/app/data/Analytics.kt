@@ -5,6 +5,7 @@ import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.floor
+import kotlin.math.pow
 
 const val PROJECTION_RATE_KG_PER_WEEK = 1.0
 
@@ -81,20 +82,31 @@ data class HoltPoint(val date: LocalDate, val level: Double, val slope: Double)
 
 /**
  * Holt's linear (double) exponential smoothing of the entries: a smoothed level plus a
- * smoothed pace, so the trend follows a steady loss without lagging behind it. The pace
- * is per day and the update is scaled by the gap between weigh-ins, so skipped days are
- * fine. [alpha] weighs new weigh-ins against the level, [beta] new paces against the pace.
+ * smoothed pace, so the trend follows a steady loss without lagging behind it.
+ *
+ * Time-aware: a gap of n days counts as n daily updates, so after a long pause the level
+ * snaps to the new weigh-in, and the pace is extrapolated for at most [paceHorizonDays]
+ * across a gap. (Extrapolating a falling pace over months of no weigh-ins pushed the
+ * trend far below the real weight, which then showed up as a fake rise.)
+ * [alpha] and [beta] are the per-day weights of new weigh-ins and new paces.
  */
-fun holtTrend(weights: List<WeightEntry>, alpha: Double = 0.3, beta: Double = 0.1): List<HoltPoint> {
+fun holtTrend(
+    weights: List<WeightEntry>,
+    alpha: Double = 0.3,
+    beta: Double = 0.1,
+    paceHorizonDays: Double = 7.0,
+): List<HoltPoint> {
     val first = weights.firstOrNull() ?: return emptyList()
     var level = first.weight
     var slope = 0.0
     val points = mutableListOf(HoltPoint(first.date, level, slope))
     for (i in 1 until weights.size) {
         val days = ChronoUnit.DAYS.between(weights[i - 1].date, weights[i].date).coerceAtLeast(1).toDouble()
-        val predicted = level + slope * days
-        val newLevel = alpha * weights[i].weight + (1 - alpha) * predicted
-        slope = beta * (newLevel - level) / days + (1 - beta) * slope
+        val a = 1 - (1 - alpha).pow(days)
+        val b = 1 - (1 - beta).pow(days)
+        val predicted = level + slope * minOf(days, paceHorizonDays)
+        val newLevel = a * weights[i].weight + (1 - a) * predicted
+        slope = b * (newLevel - level) / days + (1 - b) * slope
         level = newLevel
         points += HoltPoint(weights[i].date, level, slope)
     }
@@ -113,7 +125,7 @@ data class ProjectionCone(val start: HoltPoint, val goal: Double, val fastSlope:
     val slowDate: LocalDate? get() = dateAt(slowSlope)
     val midDate: LocalDate? get() = dateAt(start.slope)
 
-    /** Last date the chart shows: the slow edge's arrival, at most a year ahead. */
+    /** Where the cone ends if nothing cuts it short: the slow edge's arrival, at most a year ahead. */
     val endDate: LocalDate
         get() {
             val cap = start.date.plusDays(365)
@@ -121,9 +133,9 @@ data class ProjectionCone(val start: HoltPoint, val goal: Double, val fastSlope:
             return if (end.isAfter(cap)) cap else end
         }
 
-    /** Trend level at [date] when losing at [slope] kg/day, never below the goal. */
+    /** Trend level at [date] at [slope] kg/day: never below the goal, never above today's level. */
     fun levelAt(slope: Double, date: LocalDate): Double =
-        maxOf(goal, start.level + slope * ChronoUnit.DAYS.between(start.date, date))
+        (start.level + slope * ChronoUnit.DAYS.between(start.date, date)).coerceIn(goal, start.level)
 }
 
 /** Pace range of the last [windowDays] days; null without a goal, at the goal, or when not losing at all. */
