@@ -128,6 +128,18 @@ class AnalyticsTest {
     }
 
     @Test
+    fun holtDoesNotOvershootAcrossALongGap() {
+        // Losing 0.1 kg/day, then 100 days without weigh-ins, back at 78.8 kg and slowly losing.
+        val before = steadyLoss(60, every = 2)
+        val restart = before.last().date.plusDays(100)
+        val after = (0..48 step 2).map { WeightEntry(restart.plusDays(it.toLong()), round2(78.8 - 0.05 * it)) }
+        val trend = holtTrend(before + after).filter { !it.date.isBefore(restart) }
+        assertEquals(78.8, trend.first().level, 0.1)
+        // No fake rise: the trend keeps going down after the gap.
+        assertTrue(trend.zipWithNext().all { (a, b) -> b.level <= a.level + 1e-9 })
+    }
+
+    @Test
     fun holtIsFlatForAFlatWeight() {
         val last = holtTrend((0..20).map { WeightEntry(LocalDate.parse("2026-08-01").plusDays(it.toLong()), 80.0) }).last()
         assertEquals(80.0, last.level, 1e-9)
@@ -144,6 +156,8 @@ class AnalyticsTest {
         assertTrue(!cone.slowDate!!.isBefore(expected.minusDays(2)))
         assertTrue(!cone.fastDate.isAfter(cone.slowDate))
         assertEquals(80.0, cone.levelAt(cone.fastSlope, cone.endDate), 1e-9)
+        // never above today's level, even for a gaining pace
+        assertEquals(cone.start.level, cone.levelAt(0.5, cone.endDate), 1e-9)
     }
 
     @Test
